@@ -10,7 +10,7 @@ template<int N, int C>
 using image = array<filter<N>, C>;
 
 template<int in_channels, int out_channels, int K, int P = 0>
-struct CNNLayer {
+struct Layer {
 
 	array<image<K, in_channels>, out_channels> W;
 
@@ -91,45 +91,124 @@ struct CNNLayer {
 
 };
 
-template<int channels, int K, int P = 0, int stride = 1>
+template<int K, int P = 0, int stride = 1>
 struct MaxPool {
 	static_assert(stride > 0 and P >= 0 and K > P);
 
-	template<int N>
+	template<int N, int channels>
 	auto evaluate (const image<N, channels>& X) {
 		static constexpr int M = (N + P * 2) / stride;
-		image<M, channels> b{};
+		image<M, channels> Y{};
 
 		for (int c = 0; c < channels; c++)
 			for (int i = -P; i < N + P; i += stride)
 				for (int j = -P; j < N + P; j += stride) {
-					auto &v = b[(i + P) / stride][(j + P) / stride] = std::numeric_limits<double>::min();
+					auto &v = Y[c][(i + P) / stride][(j + P) / stride] = std::numeric_limits<double>::min();
 					for (int x = max(0, -i); x < min(K, N - i); x++)
 						for (int y = max(0, -j); y < min(K, N - j); y++)
-							v = max(v, X[i + x][j + y]);
+							v = max(v, X[c][i + x][j + y]);
 				}
 
-		return b;
+		return Y;
 	}
 
-	template<int N, int M>
+	template<int N, int M, int channels>
 	auto back_propagate (const image<N, channels>& X, const image<M, channels>& grad_Y) {
 		static_assert(M == (N + P * 2) / stride);
-		
+
+		image<N, channels> grad_X{};
+
+		for (int c = 0; c < channels; c++)
+			for (int i = -P; i < N + P; i += stride)
+				for (int j = -P; j < N + P; j += stride) {
+					auto max_value = std::numeric_limits<double>::min();
+					for (int x = max(0, -i); x < min(K, N - i); x++)
+						for (int y = max(0, -j); y < min(K, N - j); y++)
+							if (max_value < X[c][i + x][j + y])
+								max_value = X[c][i + x][j + y];
+					for (int x = max(0, -i); x < min(K, N - i); x++)
+						for (int y = max(0, -j); y < min(K, N - j); y++)
+							if (X[c][i + x][j + y] == max_value)
+								grad_X[c][i + x][j + y] += grad_Y[c][(i + P) / stride][(j + P) / stride];
+				}
+
+		return grad_X;
 	}
 };
 
 struct ReLu {
-	
+	// y = max(0, x);
+
+	template<int N, int channels>
+	auto evaluate (image<N, channels> X) {
+
+		for (int f = 0; f < channels; f++)
+			for (int i = 0; i < N; i++)
+				for (int j = 0; j < N; j++)
+					if (X[f][i][j] < 0)
+						X[f][i][j] = 0;
+
+		return X;
+	}
+
+	template<int N, int channels>
+	auto back_propagate (const image<N, channels>& X, const image<N, channels>& grad_Y) {
+		image<N, channels> grad_X{};
+
+		for (int f = 0; f < channels; f++)
+			for (int i = 0; i < N; i++)
+				for (int j = 0; j < N; j++)
+					if (X[f][i][j] > 0)
+						grad_X[f][i][j] = grad_Y[f][i][j];
+
+		return grad_X;
+	}
+
+};
+
+template<int percent = 50>
+struct DropOut {
+	mt19937 rng;
+	static constexpr uint64_t R = std::numeric_limits<uint32_t>::max();
+
+	DropOut (): rng(chrono::high_resolution_clock::now().time_since_epoch().count()) {}
+
+	vector<vector<vector<bool>>> memo;
+
+	template<int N, int channels>
+	auto evaluate (image<N, channels> X) {
+		memo = vector(vector(vector(N, false), N), channels);
+
+		for (int f = 0; f < channels; f++)
+			for (int i = 0; i < N; i++)
+				for (int j = 0; j < N; j++)
+					if (rng() < (R * percent / 100))
+						memo[f][i][j] = true, X[f][i][j] = 0;
+
+		return X;
+	}
+
+	template<int N, int channels>
+	auto back_propagate (image<N, channels> grad_Y) {
+
+		for (int f = 0; f < channels; f++)
+			for (int i = 0; i < N; i++)
+				for (int j = 0; j < N; j++)
+					if (memo[f][i][j])
+						grad_Y[f][i][j] = 0;
+
+		return grad_Y;
+	}
+
 };
 
 int main(){
     ios_base::sync_with_stdio(0), cin.tie(0);
 
-    CNNLayer<1, 32, 5> conv1;
-    CNNLayer<32, 32, 5> conv2;
-    CNNLayer<32, 64, 3> conv3;
-    CNNLayer<64, 64, 3> conv4;
+    Layer<1, 32, 5> conv1;
+    Layer<32, 32, 5> conv2;
+    Layer<32, 64, 3> conv3;
+    Layer<64, 64, 3> conv4;
 
 
 
