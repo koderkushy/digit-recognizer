@@ -42,7 +42,7 @@ struct model {
 
 	MaxPool<2, 0> pool1;
 	MaxPool<2, 0> pool2;
-	ReLu relu;
+	ReLU relu;
 	DropOut drop;
 
 	auto evaluate (const image<28, 1>& img) {
@@ -81,14 +81,16 @@ struct model {
 		for (int x: labels)
 			counts[x]++;
 		for (int c: counts)
-			if (c > 2 * labels.size() / (classes))
+			if (c > labels.size() / 2)
 				return false;
 		return true;
 	}
 
+	auto initialize () {}
+
 	template<int epochs, int sample_size>
 	auto gradient_descent (const pair<vector<image<28, 1>>, int>& T) {
-		
+
 	}
 
 	auto train (const pair<vector<image<28, 1>>, int>& T) {
