@@ -3,6 +3,19 @@ struct ConvolutionalLayer {
 
 	array<image<K, in_channels>, out_channels> W;
 
+	ConvolutionalLayer () {
+		// Kaiming He initialisation
+		mt19937 rng(chrono::high_resolution_clock::now().time_since_epoch().count());
+		constexpr double stddev = sqrt(2.0 / (K * K * in_channels));
+		std::normal_distribution<double> N{0, stddev};
+
+		for (int o = 0; o < out_channels; o++)
+			for (int i = 0; i < in_channels; i++)
+				for (int x = 0; x < K; x++)
+					for (int y = 0; y < K; y++)
+						W[o][i][x][y] = N(rng);
+	}
+
 	template<typename T, typename U>
 	T min (const T& x, const U& y) { return std::min(x, static_cast<T>(y)); }
 	template<typename T, typename U>

@@ -4,6 +4,10 @@ struct ParametricReLU {
 	vector<vector<vector<double>>> last_X;
 	double p{};
 
+	ParametricReLU (const double a): p(a) {
+		assert(0 < a and a < 1);
+	}
+
 	template<uint64_t N, uint64_t channels>
 	auto evaluate (image<N, channels> X) {
 
@@ -16,7 +20,7 @@ struct ParametricReLU {
 		return std::move(X);
 	}
 
-	template<int N, int channels>
+	template<uint64_t N, uint64_t channels>
 	auto train (image<N, channels> X) {
 		copy_to_vector(X, last_X);
 		return evaluate(std::move(X));
@@ -33,6 +37,7 @@ struct ParametricReLU {
 				for (int j = 0; j < N; j++)
 					if (last_X[f][i][j] < 0)
 						grad_X[f][i][j] *= p, grad_p += grad_Y[f][i][j] * last_X[f][i][j];
+
 		p += -eps * grad_p;
 		if (p < 0) p = 0;
 

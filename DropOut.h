@@ -7,7 +7,7 @@ struct DropOut {
 	vector<vector<vector<bool>>> memo;
 
 	template<uint64_t N, uint64_t channels>
-	auto evaluate (image<N, channels> X, const double p) {
+	auto train (image<N, channels> X, const double p) {
 		memo = vector(channels, vector(N, vector(N, false)));
 
 		for (int f = 0; f < channels; f++)
