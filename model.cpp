@@ -1,7 +1,6 @@
 #include "bits/stdc++.h"
 using namespace std;
 
-constexpr double eta = 0.1;
 
 template<int N> using filter = array<array<double, N>, N>;
 template<int N, int C> using image = array<filter<N>, C>;
@@ -16,6 +15,29 @@ auto copy_to_vector (const image<N, channels>& X, vector<double>& V) {
 		for (int i = 0; i < N; i++)
 			for (int j = 0; j < N; j++)
 				V.emplace_back(X[f][i][j]);
+}
+
+template<uint64_t N, uint64_t channels>
+auto array_converted (const image<N, channels>& X) {
+	array<double, N * N * channels> Y{};
+	for (int f = 0; f < channels; f++)
+		for (int i = 0; i < N; i++)
+			for (int j = 0; j < N; j++)
+				Y[(f * N + i) * N + j] = X[f][i][j];
+	return Y;
+}
+
+template<uint64_t N, uint64_t channels, uint64_t W>
+auto imagify (const array<double, W>& X) {
+	static_assert(W == N * N * channels);
+	image<N, channels> Y{};
+
+	for (int f = 0; f < channels; f++)
+		for (int i = 0; i < N; i++)
+			for (int j = 0; j < N; j++)
+				Y[f][i][j] = X[(f * N + i) * N + j];
+
+	return Y;
 }
 
 template<uint64_t N, uint64_t channels>
@@ -40,7 +62,7 @@ auto imagify (const vector<double>& V) {
 
 
 template<
-	template<int N, int channels> class Optimizer,
+	template<uint64_t N, uint64_t channels> class Optimizer,
 	class Loss,
 	int classes
 >
@@ -56,6 +78,7 @@ struct model {
 	ParametricReLU<Optimizer> relu1, relu2, relu3;
 	DropOut drop1, drop2, drop3;
 
+	mt19937 rng;
 
 	auto forward (const image<28, 1>& img) {
 		return
@@ -73,7 +96,7 @@ struct model {
 				img)))))))))));
 	}
 
-	auto forward_with_drop_out (const image<28, 1>& img, const array<double, 3> p) {
+	auto forward_with_drop_out (const image<28, 1>& img, const array<double, 3> p = {0.5, 0.5, 0.5}) {
 		return
 			fcon2.train(
 			drop3.train(
@@ -92,7 +115,7 @@ struct model {
 				img)))), p[0]))))), p[1]))), p[2]));
 	}
 
-	auto backward (const image<1, classes>& grad_Y) {
+	auto backward (const array<double, classes>& grad_Y) {
 		conv1.backward(
 		conv2.backward(
 		relu1.backward(
@@ -107,89 +130,80 @@ struct model {
 		relu3.backward(
 		drop3.backward(
 		fcon2.backward(
-			grad_Y))))))))))))));
+			imagify<1, classes, classes>(grad_Y)
+		))))))))))))));
+	}
+
+	auto save (const string& path) {
+
 	}
 
 	template<int epochs, int sample_size>
-	auto sgd (const vector<pair<image<28, 1>, int>>& T, const double persistence) {
-		assert(0 < persistence and persistence < 1);
+	auto sgd (const vector<pair<image<28, 1>, int>>& training_set, const vector<pair<image<28, 1>, int>>& validation_set) {
 
-		mt19937 rng (chrono::high_resolution_clock::now().time_since_epoch().count());
-
-		auto is_good = [&](const vector<int>& labels) {
-			array<int, classes> counts{};
-			for (int x: labels)
-				counts[x]++;
-			for (int c: counts)
-				if (c > labels.size() / 2)
-					return false;
-			return true;
-		};
-		auto generate_sample = [&]() {
-			vector<int> v(sample_size), labels(sample_size);
-			do {
-				for (int i = 0; i < sample_size; i++) {
-					int j = rng() % T.size();
-					v[i] = j, labels[i] = j;
-				}
-			} while (!is_good(labels));
-			return v;
-		};
-		auto loss = [&](const array<double, classes>& Y, const int label) {
-			double loss{};
-
-			for (int j = 0; j < classes; j++) {
-				if (j == label) loss += exp(Y[j]);
-				else loss += exp(-Y[j]);
-			}
-
-			return loss;
-		};
-		auto gradient = [&](const array<double, classes>& Y, const int label) {
-			array<double, classes> grad{};
-
-			for (int j = 0; j < classes; j++) {
-				if (j == label) grad[j] += exp(Y[j]);
-				else grad[j] += -exp(-Y[j]);
-			}
-
-			return grad;
-		};
-
-		array<double, classes> prev{};
+		double best_validation_loss = std::numeric_limits<double>::max();
 
 		for (int i = 0; i < epochs; i++) {
-			
-			array<double, classes> grad{};
 			double training_loss{};
+			array<double, classes> gradient{};
 
-			for (int i: generate_sample()) {
-				auto &[data, label] = T[i];
-				auto Y = forward_with_drop_out(data);
-				for (int j = 0; j < classes; j++) {
-					if (j == label)
-						grad[j] += exp(Y[j]), training_loss += exp(Y[j]);
-					else
-						grad[j] += -exp(-Y[j]), training_loss += exp(-Y[j]);
-				}
+			for (int p = 0; p < sample_size; p++) {
+				auto &[img, label] = training_set[rng() % training_set.size()];
+
+				auto Y{forward_with_drop_out(img)};
+
+				auto grad{Loss::gradient(array_converted(Y), label)};
+				auto loss{Loss::loss(array_converted(Y), label)};
+
+				training_loss += loss;
+				for (int i = 0; i < classes; i++)
+					gradient[i] += grad[i];
 			}
 
-			for (auto& g: grad) g /= sample_size;
-			training_loss /= sample_size;
+			for (int i = 0; i < classes; i++)
+				gradient[i] /= sample_size;
 
-			for (int j = 0; j < classes; j++)
-				prev[j] = grad[j] + prev[j] * persistence;
+			backward(gradient);
 
-			backward(prev);
+			double validation_loss{};
+			for (auto [img, label]: validation_set) {
+				validation_loss += Loss::loss(array_converted(forward(img)), label);
+			}
+
+			validation_loss /= sample_size;
+
+			if (best_validation_loss > validation_loss)
+				cout << "New loss = " << validation_loss << '\n',
+				cout << "Previous best = " << best_validation_loss << '\n',
+				cout << "Saving model...\n",
+				best_validation_loss = validation_loss,
+				save("model");
 		}
-
-
 	}
 
-	model (const double relu_slope): relu1(relu_slope), relu2(relu_slope), relu3(relu_slope) {}
+	model (const double relu_slope): relu1(relu_slope), relu2(relu_slope), relu3(relu_slope), rng(chrono::high_resolution_clock::now().time_since_epoch().count()) {}
 
-	auto train (const vector<pair<image<28, 1>, int>>& T) {
-		sgd<100, 32>(T, 0.2);
+	auto train (vector<pair<image<28, 1>, int>> training_set) {
+		shuffle(training_set.begin(), training_set.end(), rng);
+		vector validation_set(training_set.end() - training_set.size() * 0.2, training_set.end());
+
+		sgd<100, 64>(training_set, validation_set);
+	}
+
+	auto test (const vector<pair<image<28, 1>, int>>& test_set) {
+		int correct_guesses{};
+
+		for (auto [img, label]: test_set) {
+			auto Y{forward(img)};
+			bool correct = true;
+
+			for (int j = 0; j < classes; j++)
+				if (Y[j][0][0] > Y[label][0][0] + 1e-7)
+					correct = false;
+			correct_guesses += correct;
+		}
+
+		cout << "Accuracy = " << correct_guesses * 100.0 / test_set.size() << '\n';
 	}
 };
 
@@ -198,9 +212,11 @@ int main(){
 
     
     vector training_set(0, pair<image<28, 1>, int>());
+    vector test_set(0, pair<image<28, 1>, int>());
 
     model<Optimizers::RMSProp, LossFunctions::CrossEntropy, 10> m(0.01);
 
-
+    m.train(training_set);
+    m.test(test_set);
 
 }

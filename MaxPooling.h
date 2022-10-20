@@ -27,7 +27,7 @@ struct MaxPool {
 	template<uint64_t N, uint64_t channels>
 	auto train (const image<N, channels>& X) {
 		copy_to_vector(X, last_X);
-		return evaluate(X);
+		return forward(X);
 	}
 
 	template<uint64_t M, uint64_t channels>

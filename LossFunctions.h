@@ -1,5 +1,5 @@
 namespace LossFunctions {
-	template<typename T, int N>
+	template<typename T, uint64_t N>
 	auto soft_max (array<T, N> a) {
 		T sum{};
 		for (auto& x: a) sum += (x = exp(x));
@@ -8,13 +8,13 @@ namespace LossFunctions {
 	}
 
 	struct CrossEntropy {
-		template<typename T, int N>
+		template<typename T, uint64_t N>
 		static auto loss (array<T, N> a, const int label) {
 			a = soft_max(a);
 			return -log(a[label]);
 		}
 
-		template<typename T, int N>
+		template<typename T, uint64_t N>
 		static auto gradient (array<T, N> a, const int label) {
 			a = soft_max(a);
 			a[label] -= 1;

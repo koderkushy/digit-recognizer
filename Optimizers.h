@@ -1,5 +1,5 @@
 namespace Optimizers {
-	template<int N, int channels>
+	template<uint64_t N, uint64_t channels>
 	struct RMSProp {
 		const double rate, eps, decay;
 		image<N, channels> MS_grad{};

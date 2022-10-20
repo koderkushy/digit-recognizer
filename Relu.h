@@ -18,7 +18,7 @@ struct ReLU {
 	template<int N, int channels>
 	auto train (image<N, channels> X) {
 		copy_to_vector(X, last_X);
-		return evaluate(std::move(X));
+		return forward(std::move(X));
 	}
 
 	template<uint64_t N, uint64_t channels>

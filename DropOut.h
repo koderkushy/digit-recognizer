@@ -19,7 +19,7 @@ struct DropOut {
 		return std::move(X);
 	}
 
-	template<int N, int channels>
+	template<uint64_t N, uint64_t channels>
 	auto backward (image<N, channels> grad_Y) {
 
 		for (int f = 0; f < channels; f++)
