@@ -1,10 +1,18 @@
-template<int in_channels, int out_channels, int K, int P = 0>
+template<
+	template<int N, int channels> class Optimizer,
+	int in_channels,
+	int out_channels,
+	int K,
+	int P = 0
+>
 struct ConvolutionalLayer {
 
-	array<image<K, in_channels>, out_channels> W;
+	array<image<K, in_channels>, out_channels> W{};
+	vector<double> cache{};
 
 	ConvolutionalLayer () {
 		// Kaiming He initialisation
+
 		mt19937 rng(chrono::high_resolution_clock::now().time_since_epoch().count());
 		constexpr double stddev = sqrt(2.0 / (K * K * in_channels));
 		std::normal_distribution<double> N{0, stddev};
@@ -15,11 +23,6 @@ struct ConvolutionalLayer {
 					for (int y = 0; y < K; y++)
 						W[o][i][x][y] = N(rng);
 	}
-
-	template<typename T, typename U>
-	T min (const T& x, const U& y) { return std::min(x, static_cast<T>(y)); }
-	template<typename T, typename U>
-	T max (const T& x, const U& y) { return std::max(x, static_cast<T>(y)); }
 
 	template<int N, int C>
 	auto pad (const image<N, C>& a, const int k) const {
@@ -32,10 +35,8 @@ struct ConvolutionalLayer {
 		return std::move(b);
 	}
 
-	vector<vector<vector<double>>> last_X;
-
 	template<uint64_t N>
-	auto evaluate (const image<N, in_channels>& X) {
+	auto forward (const image<N, in_channels>& X) {
 		static constexpr int M = N + (P * 2) - K + 1;
 		image<M, out_channels> Y{};
 
@@ -52,15 +53,16 @@ struct ConvolutionalLayer {
 
 	template<uint64_t N>
 	auto train (const image<N, in_channels>& X) {
-		copy_to_vector(X, last_X);
-		return evaluate(X);
+		copy_to_vector(X, cache);
+		return forward(X);
 	}
 
 	template<uint64_t M>
-	auto back_propagate (const image<M, out_channels>& grad_Y) {
+	auto backward (const image<M, out_channels>& grad_Y) {
 		static constexpr int N = M + K - 1;
 
 		array<image<K, in_channels>, out_channels> grad_W{};
+		auto last_X = imagify<N, in_channels>(cache);
 
 		for (int f = 0; f < out_channels; f++)
 			for (int i = 0; i < in_channels; i++)
@@ -68,7 +70,7 @@ struct ConvolutionalLayer {
 					for (int k = 0; k < K; k++)
 						for (int x = 0; x < M; x++)
 							for (int y = 0; y < M; y++)
-								grad_W[f][i][j][k] += last_X[i][j + x][k + y] * grad_Y[f][x][y];
+								grad_W[f][i][j][k] += last_X[i][j][k] * grad_Y[f][x][y];
 
 		image<N, in_channels> grad_X{};
 
@@ -80,12 +82,9 @@ struct ConvolutionalLayer {
 							for (int y = min(K - 1, j); y > max(-1, K - 1 - N + j); y--)
 								grad_X[f][i][j] += W[k][f][x][y] * grad_Y[k][i - x][j - y];
 
-		for (int f = 0; f < out_channels; f++)
-			for (int i = 0; i < in_channels; i++)
-				for (int j = 0; j < K; j++)
-					for (int k = 0; k < K; k++)
-						W[f][i][j][k] += -eta * grad_W[f][i][j][k];
-		
+		static Optimizer<N, in_channels> optimizer;
+		optimizer.optimize(W, grad_W);
+
 		return std::move(grad_X);
 	}
 };

@@ -20,7 +20,7 @@ struct DropOut {
 	}
 
 	template<int N, int channels>
-	auto back_propagate (image<N, channels> grad_Y) {
+	auto backward (image<N, channels> grad_Y) {
 
 		for (int f = 0; f < channels; f++)
 			for (int i = 0; i < N; i++)

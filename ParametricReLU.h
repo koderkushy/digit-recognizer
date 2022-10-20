@@ -1,45 +1,53 @@
+template<
+	template<int n, int c> class Optimizer
+>
 struct ParametricReLU {
 	// y = max(0, x);
 
-	vector<vector<vector<double>>> last_X;
-	double p{};
+	vector<double> cache;
+	image<1, 1> p{};
 
-	ParametricReLU (const double a): p(a) {
+	ParametricReLU (const double a) {
 		assert(0 < a and a < 1);
+		p[0][0][0] = a;
 	}
 
 	template<uint64_t N, uint64_t channels>
-	auto evaluate (image<N, channels> X) {
+	auto forward (image<N, channels> X) {
 
 		for (int f = 0; f < channels; f++)
 			for (int i = 0; i < N; i++)
 				for (int j = 0; j < N; j++)
 					if (X[f][i][j] < 0)
-						X[f][i][j] *= p;
+						X[f][i][j] *= p[0][0][0];
 
 		return std::move(X);
 	}
 
 	template<uint64_t N, uint64_t channels>
 	auto train (image<N, channels> X) {
-		copy_to_vector(X, last_X);
-		return evaluate(std::move(X));
+		copy_to_vector(X, cache);
+		return forward(std::move(X));
 	}
 
 	template<uint64_t N, uint64_t channels>
-	auto back_propagate (const image<N, channels>& grad_Y) {
-		image<N, channels> grad_X{grad_Y};
+	auto backward (const image<N, channels>& grad_Y) {
+		auto grad_X{grad_Y};
+		auto last_X{imagify<N, channels>(cache)};
 
-		double grad_p{};
+		image<1, 1> grad_p{};
 
 		for (int f = 0; f < channels; f++)
 			for (int i = 0; i < N; i++)
 				for (int j = 0; j < N; j++)
 					if (last_X[f][i][j] < 0)
-						grad_X[f][i][j] *= p, grad_p += grad_Y[f][i][j] * last_X[f][i][j];
+						grad_X[f][i][j] *= p[0][0][0],
+						grad_p[0][0][0] += grad_Y[f][i][j] * last_X[f][i][j];
 
-		p += -eps * grad_p;
-		if (p < 0) p = 0;
+		static Optimizer<1, 1> optimizer{};
+		optimizer.optimize(p, grad_p);
+
+		if (p[0][0][0] < 0) p[0][0][0] = 0;
 
 		return std::move(grad_X);
 	}

@@ -5,7 +5,7 @@ struct MaxPool {
 	vector<vector<vector<double>>> last_X;
 
 	template<uint64_t N, uint64_t channels>
-	auto evaluate (const image<N, channels>& X) {
+	auto forward (const image<N, channels>& X) {
 		static constexpr int M = N + P * 2 - K + 1;
 		image<M, channels> Y{};
 
@@ -31,7 +31,7 @@ struct MaxPool {
 	}
 
 	template<uint64_t M, uint64_t channels>
-	auto back_propagate (const image<M, channels>& grad_Y) {
+	auto backward (const image<M, channels>& grad_Y) {
 		static constexpr int N = M + K - 1 - P * 2;
 
 		image<N, channels> grad_X{};

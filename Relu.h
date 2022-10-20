@@ -4,7 +4,7 @@ struct ReLU {
 	vector<vector<vector<double>>> last_X;
 
 	template<uint64_t N, uint64_t channels>
-	auto evaluate (image<N, channels> X) {
+	auto forward (image<N, channels> X) {
 
 		for (int f = 0; f < channels; f++)
 			for (int i = 0; i < N; i++)
@@ -22,7 +22,7 @@ struct ReLU {
 	}
 
 	template<uint64_t N, uint64_t channels>
-	auto back_propagate (const image<N, channels>& grad_Y) {
+	auto backward (const image<N, channels>& grad_Y) {
 		image<N, channels> grad_X{};
 
 		for (int f = 0; f < channels; f++)
