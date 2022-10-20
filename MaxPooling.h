@@ -1,8 +1,7 @@
 template<uint64_t K, int P = 0>
 struct MaxPool {
 	static_assert(P >= 0 and K > P);
-
-	vector<vector<vector<double>>> last_X;
+	vector<double> cache;
 
 	template<uint64_t N, uint64_t channels>
 	auto forward (const image<N, channels>& X) {
@@ -26,7 +25,7 @@ struct MaxPool {
 
 	template<uint64_t N, uint64_t channels>
 	auto train (const image<N, channels>& X) {
-		copy_to_vector(X, last_X);
+		copy_to_vector(X, cache);
 		return forward(X);
 	}
 
@@ -35,6 +34,7 @@ struct MaxPool {
 		static constexpr int N = M + K - 1 - P * 2;
 
 		image<N, channels> grad_X{};
+		auto last_X{imagify<N, channels>(cache)};
 
 		for (int c = 0; c < channels; c++)
 			for (int i = -P; i < N + P; i++)

@@ -57,11 +57,11 @@ struct FullyConnectedLayer {
 								grad_W[f][i][j][x][y][z] += grad_Y[f][i][j] * last_X[x][y][z];
 								// W[f][i][j][x][y][z] += -eta * grad_Y[f][i][j] * last_X[x][y][z];
 
-		static Optimizer<N, in_channels> optimizer;
+		static array<array<array<Optimizer<N, in_channels>, M>, M>, out_channels> optimizer;
 		for (int f = 0; f < out_channels; f++)
 			for (int i = 0; i < M; i++)
 				for (int j = 0; j < M; j++)
-					optimizer.optimize(W[f][i][j], grad_W[f][i][j]);
+					optimizer[f][i][j].optimize(W[f][i][j], grad_W[f][i][j]);
 
 		return std::move(grad_X);
 	}

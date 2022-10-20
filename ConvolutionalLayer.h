@@ -82,8 +82,10 @@ struct ConvolutionalLayer {
 							for (int y = min(K - 1, j); y > max(-1, K - 1 - N + j); y--)
 								grad_X[f][i][j] += W[k][f][x][y] * grad_Y[k][i - x][j - y];
 
-		static Optimizer<N, in_channels> optimizer;
-		optimizer.optimize(W, grad_W);
+		static array<Optimizer<K, in_channels>, out_channels> optimizer;
+		for (int f = 0; f < out_channels; f++)
+			optimizer[f].optimize(W[f], grad_W[f]);
+		// optimizer.optimize(W, grad_W);
 
 		return std::move(grad_X);
 	}
