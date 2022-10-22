@@ -55,7 +55,7 @@ auto imagify (const vector<double>& V) {
 #include "ConvolutionalLayer.h"
 #include "MaxPooling.h"
 #include "DropOut.h"
-#include "ParametricRelU.h"
+#include "ParametricReLU.h"
 #include "FullyConnectedLayer.h"
 #include "LossFunctions.h"
 #include "Optimizers.h"
@@ -67,18 +67,30 @@ template<
 	int classes
 >
 struct model {
-	ConvolutionalLayer<Optimizer, 1, 32, 5, 1> conv1;
-	ConvolutionalLayer<Optimizer, 32, 32, 5, 1> conv2;
-	ConvolutionalLayer<Optimizer, 32, 64, 3, 1> conv3;
-	ConvolutionalLayer<Optimizer, 64, 64, 3, 1> conv4;
-	FullyConnectedLayer<Optimizer, 22, 64, 32, 2> fcon1;
+	ConvolutionalLayer<Optimizer, 1, 32, 5, 1> conv1;		// 28 -> 26
+	ConvolutionalLayer<Optimizer, 32, 32, 5, 1> conv2;		// 26 -> 24
+	ParametricReLU<Optimizer> relu1;
+	MaxPool<24, 2, 0, 1> pool1;								// 24 -> 23
+	DropOut drop1;
+	ConvolutionalLayer<Optimizer, 32, 64, 3, 1> conv3;		// 23 -> 23
+	ConvolutionalLayer<Optimizer, 64, 64, 3, 1> conv4;		// 23 -> 23
+	ParametricReLU<Optimizer> relu2;
+	MaxPool<23, 2, 0, 2> pool2;								// 23 -> 11
+	DropOut drop2;
+	FullyConnectedLayer<Optimizer, 11, 64, 32, 2> fcon1;
+	ParametricReLU<Optimizer> relu3;
+	DropOut drop3;
 	FullyConnectedLayer<Optimizer, 32, 2, 1, classes> fcon2;
-	MaxPool<2, 0> pool1;
-	MaxPool<2, 0> pool2;
-	ParametricReLU<Optimizer> relu1, relu2, relu3;
-	DropOut drop1, drop2, drop3;
 
 	mt19937 rng;
+
+	using image28 = image<28, 1>;
+
+	vector<pair<image28, int>> train_set, validation_set, test_set;
+
+	model (): rng(chrono::high_resolution_clock::now().time_since_epoch().count()) {
+
+	}
 
 	auto forward (const image<28, 1>& img) {
 		return
@@ -93,7 +105,8 @@ struct model {
 			relu1.forward(
 			conv2.forward(
 			conv1.forward(
-				img)))))))))));
+				img
+			)))))))))));
 	}
 
 	auto forward_with_drop_out (const image<28, 1>& img, const array<double, 3> p = {0.5, 0.5, 0.5}) {
@@ -112,7 +125,8 @@ struct model {
 			relu1.train(
 			conv2.train(
 			conv1.train(
-				img)))), p[0]))))), p[1]))), p[2]));
+				img
+			)))), p[0]))))), p[1]))), p[2]));
 	}
 
 	auto backward (const array<double, classes>& grad_Y) {
@@ -138,17 +152,18 @@ struct model {
 
 	}
 
-	template<int epochs, int sample_size>
-	auto sgd (const vector<pair<image<28, 1>, int>>& training_set, const vector<pair<image<28, 1>, int>>& validation_set) {
-
+	auto sgd (int epochs, int sample_size) {
 		double best_validation_loss = std::numeric_limits<double>::max();
-
+		assert(!train_set.empty() and !validation_set.empty());
+		
 		for (int i = 0; i < epochs; i++) {
+			cout << "Epoch: " << i + 1 << endl;
+
 			double training_loss{};
 			array<double, classes> gradient{};
 
 			for (int p = 0; p < sample_size; p++) {
-				auto &[img, label] = training_set[rng() % training_set.size()];
+				auto &[img, label] = train_set[rng() % train_set.size()];
 
 				auto Y{forward_with_drop_out(img)};
 
@@ -160,6 +175,7 @@ struct model {
 					gradient[i] += grad[i];
 			}
 
+			training_loss /= sample_size;
 			for (int i = 0; i < classes; i++)
 				gradient[i] /= sample_size;
 
@@ -171,23 +187,66 @@ struct model {
 			}
 
 			validation_loss /= sample_size;
+			cout << "Validation loss = " << validation_loss << '\n';
 
 			if (best_validation_loss > validation_loss)
-				cout << "New loss = " << validation_loss << '\n',
 				cout << "Previous best = " << best_validation_loss << '\n',
 				cout << "Saving model...\n",
 				best_validation_loss = validation_loss,
 				save("model");
+
+			cout << "=================================\n\n";
 		}
 	}
 
-	model (const double relu_slope): relu1(relu_slope), relu2(relu_slope), relu3(relu_slope), rng(chrono::high_resolution_clock::now().time_since_epoch().count()) {}
+	auto load_data (const string csv_path) {
+		if (freopen(csv_path.c_str(), "r", stdin) == NULL)
+			cout << "Couldn't open file.\n", exit(0);
 
-	auto train (vector<pair<image<28, 1>, int>> training_set) {
-		shuffle(training_set.begin(), training_set.end(), rng);
-		vector validation_set(training_set.end() - training_set.size() * 0.2, training_set.end());
+		constexpr int N = 28;
 
-		sgd<100, 64>(training_set, validation_set);
+		vector<pair<image<N, 1>, int>> set{};
+		string s, word; cin >> s;
+
+		while (cin >> s) {
+			vector<int> s_split{};
+			s_split.reserve(N * N + 1);
+			stringstream ss(s);
+
+			while (!ss.eof())
+				getline(ss, word, ','),
+				s_split.push_back(stoi(word));
+
+			if (s_split.size() != N * N + 1)
+				cout << "Incorrect file format.\n", exit(0);
+
+			image<N, 1> img{};
+			for (int i = 0; i < N; i++)
+				for (int j = 0; j < N; j++)
+					img[0][i][j] = s_split[i * N + j + 1] / 256.0;
+
+			auto &label = s_split[0];
+
+			set.push_back(pair(img, label));
+		}
+
+		return set;
+	}
+
+	auto train (const string train_csv_path, int epochs, int sample_size, double validation_ratio) {
+		train_set = load_data(train_csv_path);
+
+		shuffle(train_set.begin(), train_set.end(), rng);
+		auto j = train_set.end() - train_set.size() * validation_ratio;
+		
+		validation_set = vector(j, train_set.end());
+		train_set.erase(j, train_set.end());
+
+		cout << "Training set has " << train_set.size() << " images\n"
+			<< "Validation set has " << validation_set.size() << " images\n" << endl;
+
+		sgd(epochs, sample_size);
+
 	}
 
 	auto test (const vector<pair<image<28, 1>, int>>& test_set) {
@@ -210,13 +269,20 @@ struct model {
 int main(){
     ios_base::sync_with_stdio(0), cin.tie(0);
 
-    
-    vector training_set(0, pair<image<28, 1>, int>());
-    vector test_set(0, pair<image<28, 1>, int>());
+    model<Optimizers::RMSProp, LossFunctions::CrossEntropy, 10> m;
 
-    model<Optimizers::RMSProp, LossFunctions::CrossEntropy, 10> m(0.01);
+    auto train_csv_path = "data/train/mnist_train_small.csv";
 
-    m.train(training_set);
-    m.test(test_set);
+	cout << "Enter number of Epochs\n" << flush;
+	int epoch_count; cin >> epoch_count;
+
+	cout << "Enter sample size for gradient descent\n" << flush;
+	int sample_size; cin >> sample_size;
+
+	cout << "Enter fraction of training data to be used for validation\n" << flush;
+	double validation_ratio; cin >> validation_ratio;
+
+    m.train(train_csv_path, epoch_count, sample_size, validation_ratio);
+
 
 }

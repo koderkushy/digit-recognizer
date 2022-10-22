@@ -12,6 +12,7 @@ struct FullyConnectedLayer {
 
 	FullyConnectedLayer () {
 		// Kaiming He initialisation
+
 		mt19937 rng(chrono::high_resolution_clock::now().time_since_epoch().count());
 		constexpr double stddev = sqrt(2.0 / (N * N * in_channels));
 		std::normal_distribution<double> gen{0, stddev};

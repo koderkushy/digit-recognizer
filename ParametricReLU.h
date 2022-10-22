@@ -7,7 +7,7 @@ struct ParametricReLU {
 	vector<double> cache;
 	image<1, 1> p{};
 
-	ParametricReLU (const double a) {
+	ParametricReLU (const double a = 0.01) {
 		assert(0 < a and a < 1);
 		p[0][0][0] = a;
 	}
