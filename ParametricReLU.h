@@ -1,15 +1,15 @@
 template<
-	template<int n, int c> class Optimizer
+	class Optimizer
 >
 struct ParametricReLU {
 	// y = max(0, x);
 
 	vector<double> cache;
-	image<1, 1> p{};
+	double p{};
 
 	ParametricReLU (const double a = 0.01) {
 		assert(0 < a and a < 1);
-		p[0][0][0] = a;
+		p = a;
 	}
 
 	template<uint64_t N, uint64_t channels>
@@ -19,7 +19,7 @@ struct ParametricReLU {
 			for (int i = 0; i < N; i++)
 				for (int j = 0; j < N; j++)
 					if (X[f][i][j] < 0)
-						X[f][i][j] *= p[0][0][0];
+						X[f][i][j] *= p;
 
 		return std::move(X);
 	}
@@ -35,20 +35,26 @@ struct ParametricReLU {
 		auto grad_X{grad_Y};
 		auto last_X{imagify<N, channels>(cache)};
 
-		image<1, 1> grad_p{};
+		double grad_p{};
 
 		for (int f = 0; f < channels; f++)
 			for (int i = 0; i < N; i++)
 				for (int j = 0; j < N; j++)
 					if (last_X[f][i][j] < 0)
-						grad_X[f][i][j] *= p[0][0][0],
-						grad_p[0][0][0] += grad_Y[f][i][j] * last_X[f][i][j];
+						grad_X[f][i][j] *= p,
+						grad_p += grad_Y[f][i][j] * last_X[f][i][j];
 
-		static Optimizer<1, 1> optimizer{};
+		static Optimizer optimizer{};
 		optimizer.optimize(p, grad_p);
 
-		if (p[0][0][0] < 0) p[0][0][0] = 0;
+		if (p < 0) p = 0;
 
 		return std::move(grad_X);
+	}
+
+	void save (const string path) {
+		ofstream out(path);
+		out << fixed << setprecision(10);
+		out << p;
 	}
 };

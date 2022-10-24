@@ -1,5 +1,5 @@
 template<
-	template<int n, int channels> class Optimizer,
+	class Optimizer,
 	int N,
 	int in_channels,
 	int M,
@@ -7,7 +7,9 @@ template<
 >
 struct FullyConnectedLayer {
 
-	array<array<array<image<N, in_channels>, M>, M>, out_channels> W{};
+
+	array<array<double, N * N * in_channels>, M * M * out_channels> W{};
+	// array<array<array<image<N, in_channels>, M>, M>, out_channels> W{};
 	vector<double> cache{};
 
 	FullyConnectedLayer () {
@@ -17,53 +19,61 @@ struct FullyConnectedLayer {
 		constexpr double stddev = sqrt(2.0 / (N * N * in_channels));
 		std::normal_distribution<double> gen{0, stddev};
 
-		for (int o = 0; o < out_channels; o++)
-			for (int p = 0; p < M; p++)
-				for (int q = 0; q < M; q++)
-					for (int i = 0; i < in_channels; i++)
-						for (int x = 0; x < N; x++)
-							for (int y = 0; y < N; y++)
-								W[o][p][q][i][x][y] = gen(rng);
+		for (int i = 0; i < M * M * out_channels; i++)
+			for (int j = 0; j < N * N * in_channels; j++)
+				W[i][j] = gen(rng);
 	}
 
 	auto forward (const image<N, in_channels>& X) {
-		image<M, out_channels> Y{};
-		for (int f = 0; f < out_channels; f++)
-			for (int i = 0; i < M; i++)
-				for (int j = 0; j < M; j++)
-					for (int x = 0; x < in_channels; x++)
-						for (int y = 0; y < N; y++)
-							for (int z = 0; z < N; z++)
-								Y[f][i][j] += W[f][i][j][x][y][z] * X[x][y][z];
-		return std::move(Y);
+		auto arr_X {array_converted(X)};
+		array<double, M * M * out_channels> arr_Y{};
+
+		for (int i = 0; i < M * M * out_channels; i++)
+			for (int j = 0; j < N * N * in_channels; j++)
+				arr_Y[i] += arr_X[j] * W[i][j];
+
+		return std::move(imagify<M, out_channels, M * M * out_channels>(arr_Y));
 	}
 
 	auto train (const image<N, in_channels>& X) {
+			auto start = chrono::high_resolution_clock::now();
+		
 		copy_to_vector(X, cache);
-		return forward(X);
+
+		auto Y {forward(X)};
+
+			auto stop = chrono::high_resolution_clock::now();
+
+			cout << "fcon " << chrono::duration_cast<chrono::milliseconds>(stop - start).count() << '\n';
+
+		return std::move(Y);
 	}
 
 	auto backward (const image<M, out_channels>& grad_Y) {
-		image<N, in_channels> grad_X{};
-		decltype(W) grad_W{};
-		auto last_X = imagify<N, in_channels>(cache);
 
-		for (int f = 0; f < out_channels; f++)
-			for (int i = 0; i < M; i++)
-				for (int j = 0; j < M; j++)
-					for (int x = 0; x < in_channels; x++)
-						for (int y = 0; y < N; y++)
-							for (int z = 0; z < N; z++)
-								grad_X[x][y][z] += W[f][i][j][x][y][z] * grad_Y[f][i][j],
-								grad_W[f][i][j][x][y][z] += grad_Y[f][i][j] * last_X[x][y][z];
-								// W[f][i][j][x][y][z] += -eta * grad_Y[f][i][j] * last_X[x][y][z];
+		auto arr_grad_Y {array_converted(grad_Y)};
+		auto arr_last_X {array_converted(imagify<N, in_channels>(cache))};
+		array<double, N * N * in_channels> arr_grad_X {};
+		decltype(W) grad_W {};
 
-		static array<array<array<Optimizer<N, in_channels>, M>, M>, out_channels> optimizer;
-		for (int f = 0; f < out_channels; f++)
-			for (int i = 0; i < M; i++)
-				for (int j = 0; j < M; j++)
-					optimizer[f][i][j].optimize(W[f][i][j], grad_W[f][i][j]);
+		static array<array<Optimizer, N * N * in_channels>, M * M * out_channels> optimizer;
 
-		return std::move(grad_X);
+		for (int i = 0; i < M * M * out_channels; i++)
+			for (int j = 0; j < N * N * in_channels; j++)
+				arr_grad_X[j] += arr_grad_Y[i] * W[i][j],
+				grad_W[i][j] = arr_grad_Y[i] * arr_last_X[j],
+				optimizer[i][j].optimize(W[i][j], grad_W[i][j]);
+
+		return std::move(imagify<N, in_channels, N*N*in_channels>(arr_grad_X));
+	}
+
+	void save (const string path) {
+		ofstream out(path);
+		out << fixed << setprecision(10);
+
+		for (int i = 0; i < M * M * out_channels; i++)
+			for (int j = 0; j < N * N * in_channels; j++)
+				out << W[i][j] << ",";
+
 	}
 };

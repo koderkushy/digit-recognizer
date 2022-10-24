@@ -1,6 +1,6 @@
 #include "bits/stdc++.h"
+#include <execution>
 using namespace std;
-
 
 template<int N> using filter = array<array<double, N>, N>;
 template<int N, int C> using image = array<filter<N>, C>;
@@ -42,14 +42,95 @@ auto imagify (const array<double, W>& X) {
 
 template<uint64_t N, uint64_t channels>
 auto imagify (const vector<double>& V) {
+	assert(N * N * channels == V.size());
 	image<N, channels> X{};
 
-	for (int f = 0; f < channels; f++)
-		for (int i = 0; i < N; i++)
-			for (int j = 0; j < N; j++)
-				X[f][i][j] = V[(f * N + i) * N + j];
+	for (int i = 0; i < N * N * channels; i++)
+		X[i / (N * N)][(i / N) % N][i % N] = V[i];
 
 	return X;
+}
+
+template<int N, int C, int P>
+auto pad (const image<N, C>& X) {
+	image<N + P * 2, C> Y{};
+	if constexpr (P == 0)
+		Y = X;
+	else if constexpr (P > 0) {
+		for (int c = 0; c < C; c++)
+			for (int i = 0; i < N; i++)
+				for (int j = 0; j < N; j++)
+					Y[c][i + P][j + P] = X[c][i][j];
+	} else {
+		for (int c = 0; c < C; c++)
+			for (int i = P; i < N - P; i++)
+				for (int j = P; j < N - P; j++)
+					Y[c][i - P][j - P] = X[c][i][j];
+	}
+	return std::move(Y);
+}
+
+template<int N, int P>
+auto pad (const filter<N>& X) {
+	filter<N + P * 2> Y{};
+	if constexpr (P == 0)
+		Y = X;
+	else if constexpr (P > 0) {
+		for (int i = 0; i < N; i++)
+			for (int j = 0; j < N; j++)
+				Y[i + P][j + P] = X[i][j];
+	} else {
+		for (int i = P; i < N - P; i++)
+			for (int j = P; j < N - P; j++)
+				Y[i - P][j - P] = X[i][j];
+	}
+	return std::move(Y);
+}
+
+template<uint64_t M, uint64_t N, uint64_t K>
+void mat_mul (const array<array<double, N>, M>& A, const array<array<double, N>, K>& B_T, array<array<double, K>, M>& __restrict__ C) {
+	for (int i = 0; i < M; i++)
+		for (int j = 0; j < K; j++)
+			for (int k = 0; k < N; k++)
+				C[i][j] += A[i][k] * B_T[j][k];
+}
+
+template<uint64_t N, uint64_t NC, uint64_t K, uint64_t KC>
+auto convolve (const image<N, NC>& X, const array<image<K, NC>, KC>& W) {
+	static constexpr int M = N - K + 1;
+	image<M, KC> Y{};
+
+	array<array<double, K * K * NC>, KC> W_mat{};
+	for (int f = 0; f < KC; f++)
+		for (int g = 0; g < NC; g++)
+			for (int i = 0; i < K; i++)
+				for (int j = 0; j < K; j++)
+					W_mat[f][(g * K + i) * K + j] = W[f][g][i][j];
+
+	array<array<double, K * K * NC>, M * M> X_mat{};
+	for (int i = 0; i < M; i++)
+		for (int j = 0; j < M; j++)
+			for (int g = 0; g < NC; g++)
+				for (int x = 0; x < K; x++)
+					for (int y = 0; y < K; y++)
+						X_mat[i * M + j][y + K * (x + K * g)] = X[g][i + x][j + y];
+
+	array<array<double, M * M>, KC> Y_mat{};
+
+	mat_mul(W_mat, X_mat, Y_mat);
+
+	for (int f = 0; f < KC; f++)
+		Y[f] = imagify<M, 1, M * M>(Y_mat[f])[0];
+
+	return std::move(Y);
+}
+
+
+template<uint64_t N, uint64_t K>
+auto convolve (const filter<N>& X, const filter<K>& W) {
+	image<N, 1> _X{}; _X[0] = X;
+	array<image<K, 1>, 1> _W{}; _W[0][0] = W;
+	return convolve(_X, _W);
 }
 
 #include "ConvolutionalLayer.h"
@@ -62,25 +143,25 @@ auto imagify (const vector<double>& V) {
 
 
 template<
-	template<uint64_t N, uint64_t channels> class Optimizer,
+	class OptimizerClass,
 	class Loss,
 	int classes
 >
 struct model {
-	ConvolutionalLayer<Optimizer, 1, 32, 5, 1> conv1;		// 28 -> 26
-	ConvolutionalLayer<Optimizer, 32, 32, 5, 1> conv2;		// 26 -> 24
-	ParametricReLU<Optimizer> relu1;
+	ConvolutionalLayer<OptimizerClass, 1, 32, 5, 1> conv1;		// 28 -> 26
+	ConvolutionalLayer<OptimizerClass, 32, 32, 5, 1> conv2;		// 26 -> 24
+	ParametricReLU<OptimizerClass> relu1;
 	MaxPool<24, 2, 0, 1> pool1;								// 24 -> 23
 	DropOut drop1;
-	ConvolutionalLayer<Optimizer, 32, 64, 3, 1> conv3;		// 23 -> 23
-	ConvolutionalLayer<Optimizer, 64, 64, 3, 1> conv4;		// 23 -> 23
-	ParametricReLU<Optimizer> relu2;
+	ConvolutionalLayer<OptimizerClass, 32, 64, 3, 1> conv3;		// 23 -> 23
+	ConvolutionalLayer<OptimizerClass, 64, 64, 3, 1> conv4;		// 23 -> 23
+	ParametricReLU<OptimizerClass> relu2;
 	MaxPool<23, 2, 0, 2> pool2;								// 23 -> 11
 	DropOut drop2;
-	FullyConnectedLayer<Optimizer, 11, 64, 32, 2> fcon1;
-	ParametricReLU<Optimizer> relu3;
+	FullyConnectedLayer<OptimizerClass, 11, 64, 16, 2> fcon1;
+	ParametricReLU<OptimizerClass> relu3;
 	DropOut drop3;
-	FullyConnectedLayer<Optimizer, 32, 2, 1, classes> fcon2;
+	FullyConnectedLayer<OptimizerClass, 16, 2, 1, classes> fcon2;
 
 	mt19937 rng;
 
@@ -89,111 +170,98 @@ struct model {
 	vector<pair<image28, int>> train_set, validation_set, test_set;
 
 	model (): rng(chrono::high_resolution_clock::now().time_since_epoch().count()) {
-
+		cout << "\nInitialised all layers.\n\n" << flush;
 	}
 
-	auto forward (const image<28, 1>& img) {
-		return
-			fcon2.forward(
-			relu3.forward(
-			fcon1.forward(
-			pool2.forward(
-		  	relu2.forward(
-		  	conv4.forward(
-		  	conv3.forward(
-			pool1.forward(
-			relu1.forward(
-			conv2.forward(
-			conv1.forward(
-				img
-			)))))))))));
+	template<bool with_drop_out = false>
+	auto forward (const image<28, 1>& img, const array<double, 3> p = {0.5, 0.5, 0.5}) {
+		if constexpr (with_drop_out)
+			return fcon2.train(drop3.train(relu3.train(fcon1.train(drop2.train(pool2.train(relu2.train(conv4.train(conv3.train(drop1.train(pool1.train(relu1.train(conv2.train(conv1.train(img)))), p[0]))))), p[1]))), p[2]));
+		else
+			return fcon2.forward(relu3.forward(fcon1.forward(pool2.forward(relu2.forward(conv4.forward(conv3.forward(pool1.forward(relu1.forward(conv2.forward(conv1.forward(img)))))))))));
 	}
+	
+	template<bool with_drop_out = false>
+	auto forward (const vector<pair<image<28, 1>, int>>& set, const array<double, 3> p = {0.5, 0.5, 0.5}) {
+		vector<pair<array<double, classes>, int>> res(set.size());
+		vector<int> index(set.size());
+		iota(begin(index), end(index), 0);
 
-	auto forward_with_drop_out (const image<28, 1>& img, const array<double, 3> p = {0.5, 0.5, 0.5}) {
-		return
-			fcon2.train(
-			drop3.train(
-			relu3.train(
-			fcon1.train(
-			drop2.train(
-			pool2.train(
-		  	relu2.train(
-		  	conv4.train(
-		  	conv3.train(
-		  	drop1.train(
-			pool1.train(
-			relu1.train(
-			conv2.train(
-			conv1.train(
-				img
-			)))), p[0]))))), p[1]))), p[2]));
+		for_each (execution::par, begin(index), end(index), [&](const auto& i) {
+			const auto& [img, label] = set[i];
+			res[i] = pair(array_converted(forward<with_drop_out>(img, p)), label);
+		});
+
+		return std::move(res);
 	}
 
 	auto backward (const array<double, classes>& grad_Y) {
-		conv1.backward(
-		conv2.backward(
-		relu1.backward(
-		pool1.backward(
-		drop1.backward(
-		conv3.backward(
-		conv4.backward(
-		relu2.backward(
-		pool2.backward(
-		drop2.backward(
-		fcon1.backward(
-		relu3.backward(
-		drop3.backward(
-		fcon2.backward(
-			imagify<1, classes, classes>(grad_Y)
-		))))))))))))));
+		conv1.backward(conv2.backward(relu1.backward(pool1.backward(drop1.backward(conv3.backward(conv4.backward(relu2.backward(pool2.backward(drop2.backward(fcon1.backward(relu3.backward(drop3.backward(fcon2.backward(imagify<1, classes, classes>(grad_Y)))))))))))))));
 	}
 
 	auto save (const string& path) {
-
+		conv1.save(path + "/conv1.csv");
+		conv2.save(path + "/conv2.csv");
+		conv3.save(path + "/conv3.csv");
+		conv4.save(path + "/conv4.csv");
+		fcon1.save(path + "/fcon1.csv");
+		fcon2.save(path + "/fcon2.csv");
+		relu1.save(path + "/relu1.csv");
+		relu2.save(path + "/relu2.csv");
+		relu3.save(path + "/relu3.csv");
 	}
 
 	auto sgd (int epochs, int sample_size) {
 		double best_validation_loss = std::numeric_limits<double>::max();
 		assert(!train_set.empty() and !validation_set.empty());
 		
-		for (int i = 0; i < epochs; i++) {
-			cout << "Epoch: " << i + 1 << endl;
+		for (int i = 1; i < epochs + 1; i++) {
+			cout << "Epoch: " << i << '\n' << flush;
 
-			double training_loss{};
+			vector<pair<image28, int>> sample_set(sample_size);
+
+			generate (begin(sample_set), end(sample_set), [&]() {
+				return train_set[rng() % train_set.size()];
+			});
+
 			array<double, classes> gradient{};
 
-			for (int p = 0; p < sample_size; p++) {
-				auto &[img, label] = train_set[rng() % train_set.size()];
+			auto start = chrono::high_resolution_clock::now();
 
-				auto Y{forward_with_drop_out(img)};
-
-				auto grad{Loss::gradient(array_converted(Y), label)};
-				auto loss{Loss::loss(array_converted(Y), label)};
-
-				training_loss += loss;
+			for (const auto& [x, label]: forward<true>(sample_set)) {
+				auto grad {Loss::gradient(x, label)};
 				for (int i = 0; i < classes; i++)
 					gradient[i] += grad[i];
 			}
 
-			training_loss /= sample_size;
+			auto stop = chrono::high_resolution_clock::now();
+
+			cout << chrono::duration_cast<chrono::milliseconds>(stop - start).count() << '\n';
+
 			for (int i = 0; i < classes; i++)
-				gradient[i] /= sample_size;
+				cout << (gradient[i] /= sample_size) << ' ' ;
+			cout << '\n';
 
 			backward(gradient);
 
-			double validation_loss{};
-			for (auto [img, label]: validation_set) {
-				validation_loss += Loss::loss(array_converted(forward(img)), label);
+			if (i % 5 == 0) {
+				cout << "Validating...\n" << flush;
+
+				double validation_loss{};
+
+				for (const auto& [x, label]: forward<false>(validation_set)) {
+					validation_loss += Loss::loss(x, label);
+				}
+
+				validation_loss /= validation_set.size();
+				cout << "Validation loss = " << validation_loss << '\n';
+
+				if (best_validation_loss > validation_loss)
+					cout << "Previous best = " << best_validation_loss << '\n',
+					cout << "Saving model...\n",
+					best_validation_loss = validation_loss,
+					save("model_parameters");
 			}
-
-			validation_loss /= sample_size;
-			cout << "Validation loss = " << validation_loss << '\n';
-
-			if (best_validation_loss > validation_loss)
-				cout << "Previous best = " << best_validation_loss << '\n',
-				cout << "Saving model...\n",
-				best_validation_loss = validation_loss,
-				save("model");
 
 			cout << "=================================\n\n";
 		}
@@ -206,7 +274,8 @@ struct model {
 		constexpr int N = 28;
 
 		vector<pair<image<N, 1>, int>> set{};
-		string s, word; cin >> s;
+		string s, word;
+		// cin >> s;
 
 		while (cin >> s) {
 			vector<int> s_split{};
@@ -230,7 +299,7 @@ struct model {
 			set.push_back(pair(img, label));
 		}
 
-		return set;
+		return std::move(set);
 	}
 
 	auto train (const string train_csv_path, int epochs, int sample_size, double validation_ratio) {
@@ -269,9 +338,7 @@ struct model {
 int main(){
     ios_base::sync_with_stdio(0), cin.tie(0);
 
-    model<Optimizers::RMSProp, LossFunctions::CrossEntropy, 10> m;
-
-    auto train_csv_path = "data/train/mnist_train_small.csv";
+    auto train_csv_path = "sample_data/mnist_train_small.csv";
 
 	cout << "Enter number of Epochs\n" << flush;
 	int epoch_count; cin >> epoch_count;
@@ -282,6 +349,11 @@ int main(){
 	cout << "Enter fraction of training data to be used for validation\n" << flush;
 	double validation_ratio; cin >> validation_ratio;
 
+	Optimizers::RMSProp::rate = 0.001;
+	Optimizers::RMSProp::eps = 1e-5;
+	Optimizers::RMSProp::decay = 0.9;
+
+    model<Optimizers::RMSProp, LossFunctions::CrossEntropy, 10> m;
     m.train(train_csv_path, epoch_count, sample_size, validation_ratio);
 
 

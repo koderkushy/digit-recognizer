@@ -1,2 +1,5 @@
-model.exe
-data/train/train.csv
+model
+modelcon
+modelmat
+modelmat2
+path

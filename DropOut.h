@@ -8,7 +8,9 @@ struct DropOut {
 	vector<bool> cache{};
 
 	template<uint64_t N, uint64_t channels>
-	auto train (image<N, channels> X, const double p) {
+	auto train (image<N, channels> X, const double p = 0.5) {
+
+		assert(p > 0 and p < 1);
 		cache.resize(N * N * channels);
 
 		for (int f = 0; f < channels; f++)

@@ -11,7 +11,7 @@ namespace LossFunctions {
 		template<typename T, uint64_t N>
 		static auto loss (array<T, N> a, const int label) {
 			a = soft_max(a);
-			return -log(a[label]);
+			return -log(a[label] + 1e-5);
 		}
 
 		template<typename T, uint64_t N>
