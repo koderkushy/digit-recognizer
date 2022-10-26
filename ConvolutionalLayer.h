@@ -7,21 +7,26 @@ template<
 >
 struct ConvolutionalLayer {
 
-	array<image<K, in_channels>, out_channels> W{};
-	vector<double> cache{};
+	array<image<K, in_channels>, out_channels> W { };
+	array<double, out_channels> b { };
+	vector<double> cache { };
 
 	ConvolutionalLayer () {
 		// Kaiming He initialisation
 
 		mt19937 rng(chrono::high_resolution_clock::now().time_since_epoch().count());
-		constexpr double stddev = sqrt(2.0 / (K * K * in_channels));
-		std::normal_distribution<double> N{0, stddev};
+		std::normal_distribution<double> 
+			weight_gaussian { 0, sqrt(2.0 / K * K * in_channels) },
+			bias_gaussian { 0, sqrt(2.0 / 10) };
 
 		for (int o = 0; o < out_channels; o++)
 			for (int i = 0; i < in_channels; i++)
 				for (int x = 0; x < K; x++)
 					for (int y = 0; y < K; y++)
-						W[o][i][x][y] = N(rng);
+						W[o][i][x][y] = weight_gaussian(rng);
+
+		for (int f = 0; f < out_channels; f++)
+			b[f] = bias_gaussian(rng);
 
 	}
 
@@ -29,64 +34,82 @@ struct ConvolutionalLayer {
 	auto forward (const image<N, in_channels>& X_unpadded) {
 		static constexpr int M = N + (P * 2) - K + 1;
 
-		return convolve(pad<N, in_channels, P>(X_unpadded), W);
+		auto Y { convolve(pad<N, in_channels, P>(X_unpadded), W) };
+		for (int f = 0; f < out_channels; f++)
+			for (int i = 0; i < M; i++)
+				for (int j = 0; j < M; j++)
+					Y[f][i][j] += b[f];
+
+		return std::move(Y);
 	}
 
 	template<uint64_t N>
 	auto train (const image<N, in_channels>& X) {
-			auto start = chrono::high_resolution_clock::now();
-
 		copy_to_vector(X, cache);
-		auto Y {forward(X)};
-
-			auto stop = chrono::high_resolution_clock::now();
-
-			cout << "conv " << chrono::duration_cast<chrono::milliseconds>(stop - start).count() << '\n';
-
-		return std::move(Y);
-
+		return forward(X);
 	}
 
 	template<uint64_t M>
 	auto backward (const image<M, out_channels>& grad_Y) {
 		static constexpr int N = M - P * 2 + K - 1;
 
-		array<image<K, in_channels>, out_channels> grad_W {};
-		auto last_X {imagify<N, in_channels>(cache)};
+		static array<array<array<array<Optimizer, K>, K>, in_channels>, out_channels> W_optimizer{};
+		static array<Optimizer, out_channels> b_optimizer { };
 
+		auto X { imagify<N, in_channels>(cache) };
+		auto W_flipped { W };
+
+		decltype(W) grad_W { };
+		decltype(b) grad_b { };
+		decltype(X) grad_X { };
+
+		// Compute gradients wrt W
+		for (int g = 0; g < in_channels; g++) {
+			auto X_g { pad<N, P>(X[g]) };
+
+			for (int f = 0; f < out_channels; f++)
+				grad_W[f][g] = convolve(X_g, grad_Y[f])[0];
+		}
+
+		// Flip W
 		for (int f = 0; f < out_channels; f++)
 			for (int g = 0; g < in_channels; g++)
-				grad_W[f][g] = convolve(pad<N, P>(last_X[g]), grad_Y[f])[0];
-
-		image<N, in_channels> grad_X {};
-		auto grad_Y_padded {pad<M, out_channels, K - 1>(grad_Y)};
-		decltype(W) W_flipped {};
-
-		for (int f = 0; f < out_channels; f++)
-			for (int g = 0; g < in_channels; g++)
-				for (int i = 0; i < K; i++)
+				for (int i = 0; i < K; i++) {
 					for (int j = 0; j < K; j++)
-						W_flipped[f][g][i][j] = W[f][g][K - i - 1][K - j - 1];
+						reverse(W_flipped[f][g][i].begin(), W_flipped[f][g][i].end());
+					reverse(W_flipped[f][g].begin(), W_flipped[f][g].end());
+				}
+
+		// Compute gradients wrt X
+		auto grad_Y_padded { pad<M, out_channels, K - 1>(grad_Y) };
 
 		for (int g = 0; g < in_channels; g++) {
 			for (int f = 0; f < out_channels; f++) {
 				auto component {convolve(grad_Y_padded[f], W_flipped[f][g])[0]};
+
 				for (int i = 0; i < N; i++)
 					for (int j = 0; j < N; j++)
 						grad_X[g][i][j] += component[i + P][j + P];
 			}
 		}
 
-		static array<array<array<array<Optimizer, K>, K>, in_channels>, out_channels> optimizer{};
+		// Compute gradients wrt b
+		for (int f = 0; f < out_channels; f++)
+			for (int i = 0; i < M; i++)
+				for (int j = 0; j < M; j++)
+					grad_b[f] += grad_Y[f][i][j];
+
+		// Optimize W
 		for (int o = 0; o < out_channels; o++)
 			for (int i = 0; i < in_channels; i++)
 				for (int x = 0; x < K; x++)
 					for (int y = 0; y < K; y++)
-						optimizer[o][i][x][y].optimize(W[o][i][x][y], grad_W[o][i][x][y]);
+						W_optimizer[o][i][x][y].optimize(W[o][i][x][y], grad_W[o][i][x][y]);
 
-		// static array<Optimizer<K, in_channels>, out_channels> optimizer;
-		// for (int f = 0; f < out_channels; f++)
-		// 	optimizer[f].optimize(W[f], grad_W[f]);
+		// Optimize b
+		for (int f = 0; f < out_channels; f++)
+			b_optimizer[f].optimize(b[f], grad_b[f]);
+
 
 		return std::move(grad_X);
 	}

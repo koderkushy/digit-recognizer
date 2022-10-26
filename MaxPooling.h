@@ -1,4 +1,9 @@
-template<int N, int K, int P = 0, int S = 1>
+template<
+	int N,
+	int K,
+	int P = 0,
+	int S = 1
+>
 struct MaxPool {
 	static_assert(P >= 0 and K > P and S > 0);
 	static constexpr int M = (N + 2 * P - K + S) / S;

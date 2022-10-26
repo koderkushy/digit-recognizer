@@ -10,8 +10,8 @@ namespace Optimizers {
 		}
 	};
 
-	double RMSProp::rate {0.001};
-	double RMSProp::eps {1e-5};
+	double RMSProp::rate {0.01};
+	double RMSProp::eps {1e-8};
 	double RMSProp::decay {0.9};
 
 }

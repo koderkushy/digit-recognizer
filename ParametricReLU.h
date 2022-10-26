@@ -2,8 +2,6 @@ template<
 	class Optimizer
 >
 struct ParametricReLU {
-	// y = max(0, x);
-
 	vector<double> cache;
 	double p{};
 

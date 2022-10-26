@@ -1,4 +1,3 @@
-
 struct DropOut {
 	mt19937 rng;
 	static constexpr uint64_t R = std::numeric_limits<uint32_t>::max();
