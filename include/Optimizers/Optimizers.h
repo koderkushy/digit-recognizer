@@ -1,4 +1,8 @@
-namespace Optimizers {
+#ifndef NN_OPTIMIZERS_RMS_PROP_H_
+#define NN_OPTIMIZERS_RMS_PROP_H_
+
+namespace nn {
+namespace optimizers {
 
 	struct RMSProp {
 		static double rate, eps, decay;
@@ -11,7 +15,10 @@ namespace Optimizers {
 	};
 
 	double RMSProp::rate {0.01};
-	double RMSProp::eps {1e-8};
+	double RMSProp::eps {1e-5};
 	double RMSProp::decay {0.9};
 
-}
+} // namepsace optimizers
+} // namespace nn
+
+#endif // NN_OPTIMIZERS_RMS_PROP_H_
