@@ -95,6 +95,8 @@ public:
 			out << b[o] << ' ';
 		out << '\n' << std::flush;
 
+		out.close();
+
 		L.save(path);
 	}
 

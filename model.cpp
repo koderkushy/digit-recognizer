@@ -47,51 +47,50 @@ struct model {
 
 	model (): rng(std::chrono::high_resolution_clock::now().time_since_epoch().count()) {
 		std::cout << "Initialised all layers\n" << std::flush;
-		save("initial.txt");
 	}
 
 	auto save (const std::string path) {
 		std::ofstream out(path);
 		out.close();
-		// nn.save(path);
+		nn.save(path);
 	}
 
 	auto train_all (const int epochs, const std::array<double, 3> dropout_ratios = {0.5, 0.5, 0.5}) {
 		
 		double best_validation_loss { std::numeric_limits<double>::max() };
-		constexpr int jump = 8;
+		constexpr int jump = 16;
 		static_assert(jump % 4 == 0);
 
-		std::cout << "jump " << jump << '\n';
+		std::ofstream validation_log ("data/validation_loss.txt");
 
 		for (int i = 0; i < epochs; i++) {
 			std::cout << "Epoch: " << i + 1 << std::endl;
 
 			std::shuffle(begin(train_set), end(train_set), rng);
 
-			double training_loss { };
+			// double training_loss { };
 
 			for (auto i = begin(train_set); i + jump < end(train_set); i += jump) {
-				auto start = std::chrono::high_resolution_clock::now();
+				// auto start = std::chrono::high_resolution_clock::now();
 
-				double sample_loss { };
-				std::mutex loss_mutex;
+				// double sample_loss { };
+				// std::mutex loss_mutex;
 
 				std::for_each (std::execution::par, i, i + jump, [&](const auto& data) {
 					const auto& [img, label] = data;
 					const auto& [gradient, loss] = nn.recurse(img, label);
 
-					std::lock_guard<std::mutex> lock(loss_mutex);
-					sample_loss += loss;
+					// std::lock_guard<std::mutex> lock(loss_mutex);
+					// sample_loss += loss;
 				});
 
 				nn.optimize();
-				std::cout << std::fixed << std::setprecision(3);
-				auto stop = std::chrono::high_resolution_clock::now();
-				std::cout << "Avg Time = " << std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count() / (1000.0 * jump) << "ms\t";
-				std::cout << "Avg Loss = " << sample_loss / jump << std::endl;
+				// std::cout << std::fixed << std::setprecision(3);
+				// auto stop = std::chrono::high_resolution_clock::now();
+				// std::cout << "Avg Time = " << std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count() / (1000.0 * jump) << "ms\t";
+				// std::cout << "Avg Loss = " << sample_loss / jump << std::endl;
 
-				training_loss += sample_loss;
+				// training_loss += sample_loss;
 			}
 
 			std::cout << "Validating...\n" << std::flush;
@@ -108,16 +107,17 @@ struct model {
 
 			validation_loss /= validation_set.size();
 			std::cout << "Validation loss = " << validation_loss << '\n';
+			validation_log << validation_loss << ' ' << std::flush;
 
 			if (best_validation_loss > validation_loss)
 				std::cout << "Previous best = " << best_validation_loss << '\n',
 				std::cout << "Saving model...\n",
 				best_validation_loss = validation_loss,
-				save("model_parameters/model.txt");
+				save("data/model.txt");
 		}
 	}
 
-	auto train (const std::string train_csv_path, int epochs, int sample_size, double validation_ratio) {
+	auto train (const std::string train_csv_path, int epochs, double validation_ratio) {
 		train_set = load_data(train_csv_path);
 
 		shuffle(train_set.begin(), train_set.end(), rng);
@@ -175,7 +175,7 @@ struct model {
 int main(){
 
     auto train_csv_path = "sample_data/mnist_train_small.csv";
-    int epoch_count = 10000, sample_size = 120;
+    int epoch_count = 50;
     double validation_ratio = 0.2;
 
 	Optimizers::RMSProp::rate = 0.001;
@@ -183,7 +183,7 @@ int main(){
 	Optimizers::RMSProp::decay = 0.9;
 
     model<Optimizers::RMSProp, LossFunctions::CrossEntropy> m;
-    m.train(train_csv_path, epoch_count, sample_size, validation_ratio);
+    m.train(train_csv_path, epoch_count, validation_ratio);
 
 
 }

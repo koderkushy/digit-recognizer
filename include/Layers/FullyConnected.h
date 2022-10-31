@@ -84,6 +84,8 @@ public:
 			out << b[i] << ' ';
 		out << '\n' << std::flush;
 
+		out.close();
+		
 		L.save(path);
 	}
 
