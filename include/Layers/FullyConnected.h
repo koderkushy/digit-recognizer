@@ -5,7 +5,10 @@
 namespace nn {
 
 template<
-	class Optimizer, int kInWidth, int kOutWidth, class NextLayer
+	int kInWidth,
+	int kOutWidth,
+	class Optimizer,
+	class NextLayer
 >
 class FullyConnected {
 
@@ -16,7 +19,7 @@ public:
 		// Kaiming He initialisation
 
 		std::mt19937 rng(std::chrono::high_resolution_clock::now().time_since_epoch().count());
-		std::normal_distribution<double>
+		std::normal_distribution<float>
 			gaussian { 0, sqrt(1.0 / kInWidth) };
 
 		for (int i = 0; i < kInWidth; i++)
@@ -100,7 +103,7 @@ private:
 			// auto start = chrono::high_resolution_clock::now();
 
 		auto arr_X { nn::util::array_converted(X) };
-		std::array<double, kOutWidth> arr_Y { b };
+		std::array<float, kOutWidth> arr_Y { b };
 
 		for (int i = 0; i < kInWidth; i++)
 #pragma GCC ivdep
@@ -120,7 +123,7 @@ private:
 		auto arr_grad_Y { nn::util::array_converted(grad_Y) };
 		auto arr_X { nn::util::array_converted(X) };
 
-		std::array<double, kInWidth> arr_grad_X { };
+		std::array<float, kInWidth> arr_grad_X { };
 		decltype(W) grad_W { };
 
 		// Computing gradients wrt b
@@ -152,15 +155,15 @@ private:
 	}
 
 
-	std::array<std::array<double, kOutWidth>, kInWidth> W{ };
+	std::array<std::array<float, kOutWidth>, kInWidth> W{ };
 
-	std::array<double, kOutWidth> b{ };
+	std::array<float, kOutWidth> b{ };
 
 	NextLayer L{ };
 
-	std::array<std::array<double, kOutWidth>, kInWidth> grad_W_accumulate{ };
+	std::array<std::array<float, kOutWidth>, kInWidth> grad_W_accumulate{ };
 
-	std::array<double, kOutWidth> grad_b_accumulate{ };
+	std::array<float, kOutWidth> grad_b_accumulate{ };
 
 	int count_accumulate{ };
 

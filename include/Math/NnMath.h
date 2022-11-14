@@ -2,18 +2,18 @@
 #define NN_OPERATIONS_FASTMATH_H_
 
 
-// namespace nn {
+namespace nn {
 namespace math {
 
 struct FastMath {
 	static constexpr int MAX_WIDTH = 2048;
-	static double buf0 alignas(64) [MAX_WIDTH];
-	static double buf1 alignas(64) [MAX_WIDTH];
-	static double buf2 alignas(64) [MAX_WIDTH];
-	static double buf3 alignas(64) [MAX_WIDTH];
+	static float buf0 alignas(64) [MAX_WIDTH];
+	static float buf1 alignas(64) [MAX_WIDTH];
+	static float buf2 alignas(64) [MAX_WIDTH];
+	static float buf3 alignas(64) [MAX_WIDTH];
 
 	template<int N, int M>
-	using mat = std::array<std::array<double, M>, N>;
+	using mat = std::array<std::array<float, M>, N>;
 
 	template<uint64_t N, uint64_t M, uint64_t K>
 	static auto fast_mat_mul (const mat<N, M>& A, const mat<M, K>& B, mat<N, K>& C) {
@@ -91,8 +91,8 @@ struct FastMath {
 	}
 
 	template<uint64_t M, uint64_t N, uint64_t K>
-	static auto mat_mul (const std::array<std::array<double, N>, M>& A, const std::array<std::array<double, K>, N>& B) {
-		std::array<std::array<double, K>, M> C {};
+	static auto mat_mul (const std::array<std::array<float, N>, M>& A, const std::array<std::array<float, K>, N>& B) {
+		std::array<std::array<float, K>, M> C {};
 
 		if constexpr (std::min({N, M, K}) > 50)
 			fast_mat_mul(A, B, C);
@@ -105,50 +105,14 @@ struct FastMath {
 
 		return std::move(C);
 	}
-
-	template<uint64_t N, uint64_t NC, uint64_t K, uint64_t KC>
-	static auto convolve (const nn::util::image<N, NC>& X, const std::array<nn::util::image<K, NC>, KC>& W) {
-		static constexpr int M = N - K + 1;
-		nn::util::image<M, KC> Y{};
-
-		std::array<std::array<double, K * K * NC>, KC> W_mat{};
-		for (int f = 0; f < KC; f++)
-			for (int g = 0; g < NC; g++)
-				for (int i = 0; i < K; i++)
-					for (int j = 0; j < K; j++)
-						W_mat[f][(g * K + i) * K + j] = W[f][g][i][j];
-
-		std::array<std::array<double, M * M>, K * K * NC> X_mat{};	
-		for (int i = 0; i < M; i++)
-			for (int j = 0; j < M; j++)
-				for (int g = 0; g < NC; g++)
-					for (int x = 0; x < K; x++)
-						for (int y = 0; y < K; y++)
-							X_mat[y + K * (x + K * g)][i * M + j] = X[g][i + x][j + y];
-
-		auto Y_mat {mat_mul(W_mat, X_mat)};
-
-		for (int f = 0; f < KC; f++)
-			Y[f] = nn::util::imagify<M, 1, M * M>(Y_mat[f])[0];
-
-		return std::move(Y);
-	}
-
-	template<uint64_t N, uint64_t K>
-	static auto convolve (const nn::util::filter<N>& X, const nn::util::filter<K>& W) {
-		nn::util::image<N, 1> _X{}; _X[0] = X;
-		std::array<nn::util::image<K, 1>, 1> _W{}; _W[0][0] = W;
-		return convolve(_X, _W);
-	}
-
 };
 
-double FastMath::buf0[];
-double FastMath::buf1[];
-double FastMath::buf2[];
-double FastMath::buf3[];
+float FastMath::buf0[];
+float FastMath::buf1[];
+float FastMath::buf2[];
+float FastMath::buf3[];
 
 } // namespace math
-// } // namespace nn
+} // namespace nn
 
 #endif // NN_OPERATIONS_FASTMATH_H_

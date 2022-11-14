@@ -6,7 +6,7 @@ namespace nn {
 namespace util {
 
 template<int kFeatures>
-using filter = std::array<std::array<double, kFeatures>, kFeatures>;
+using filter = std::array<std::array<float, kFeatures>, kFeatures>;
 
 
 template<int kFeatures, int kChannels>
@@ -14,7 +14,7 @@ using image = std::array<filter<kFeatures>, kChannels>;
 
 
 template<uint64_t kFeatures, uint64_t kChannels>
-auto copy_to_vector (const image<kFeatures, kChannels>& X, std::vector<double>& V)
+auto copy_to_vector (const image<kFeatures, kChannels>& X, std::vector<float>& V)
 {
 	V.clear(), V.reserve(kFeatures * kFeatures * kChannels);
 
@@ -28,7 +28,7 @@ auto copy_to_vector (const image<kFeatures, kChannels>& X, std::vector<double>& 
 template<uint64_t kFeatures, uint64_t kChannels>
 auto array_converted (const image<kFeatures, kChannels>& X)
 {
-	std::array<double, kFeatures * kFeatures * kChannels> Y{};
+	std::array<float, kFeatures * kFeatures * kChannels> Y{};
 	for (int f = 0; f < kChannels; f++)
 		for (int i = 0; i < kFeatures; i++)
 			for (int j = 0; j < kFeatures; j++)
@@ -38,7 +38,7 @@ auto array_converted (const image<kFeatures, kChannels>& X)
 
 
 template<uint64_t kFeatures, uint64_t kChannels, uint64_t kIn>
-auto imagify (const std::array<double, kIn>& X)
+auto imagify (const std::array<float, kIn>& X)
 {
 	static_assert(kIn == kFeatures * kFeatures * kChannels);
 	image<kFeatures, kChannels> Y{ };
@@ -53,7 +53,7 @@ auto imagify (const std::array<double, kIn>& X)
 
 
 template<uint64_t kFeatures, uint64_t kChannels>
-auto imagify (const std::vector<double>& V)
+auto imagify (const std::vector<float>& V)
 {
 	assert(kFeatures * kFeatures * kChannels == V.size());
 	image<kFeatures, kChannels> X{ };

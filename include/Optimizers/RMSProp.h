@@ -6,18 +6,18 @@
 namespace Optimizers {
 
 	struct RMSProp {
-		static double rate, eps, decay;
-		double mean_square{};
+		static float rate, eps, decay;
+		float mean_square{};
 
-		auto optimize (double& W, const double& G) {
+		auto optimize (float& W, const float& G) {
 			(mean_square *= decay) += (1 - decay) * G * G;
 			W += -rate * G / (eps + sqrt(mean_square));
 		}
 	};
 
-	double RMSProp::rate {0.01};
-	double RMSProp::eps {1e-5};
-	double RMSProp::decay {0.9};
+	float RMSProp::rate {0.01};
+	float RMSProp::eps {1e-5};
+	float RMSProp::decay {0.9};
 
 } // namepsace optimizers
 // } // namespace nn

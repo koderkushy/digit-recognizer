@@ -22,22 +22,13 @@ template<
 >
 struct model {
 
-	nn::Convolutional<Optimizer, 1, 32, 5, 1,
-		nn::Convolutional<Optimizer, 32, 32, 5, 1,
-			nn::ReLU<
-				nn::MaxPool<2, 0, 1,
-					nn::DropOut<50,
-						nn::Convolutional<Optimizer, 32, 64, 3, 1,
-							nn::Convolutional<Optimizer, 64, 64, 3, 1,
-								nn::ReLU<
-									nn::MaxPool<2, 0, 2,
-										nn::DropOut<50,
-											nn::FullyConnected<Optimizer, 11 * 11 * 64, 2048,
-												nn::ReLU<
-													nn::DropOut<50,
-														nn::FullyConnected<Optimizer, 2048, 10,
-															nn::OutputLayer<10, Loss>>>>>>>>>>>>>>>
-																nn { };
+	nn::Convolutional<5, 1, 32, 1, 1, Optimizer,
+		nn::Convolutional<5, 32, 32, 1, 1, Optimizer, nn::ReLU<nn::MaxPool<2, 0, 1, nn::DropOut<50,
+			nn::Convolutional<3, 32, 64, 1, 1, Optimizer,
+				nn::Convolutional<3, 64, 64, 1, 1, Optimizer, nn::ReLU<nn::MaxPool<2, 0, 2, nn::DropOut<50,
+					nn::FullyConnected<11 * 11 * 64, 2048, Optimizer, nn::ReLU<nn::DropOut<50,
+						nn::FullyConnected<2048, 10, Optimizer, nn::OutputLayer<10, Loss>>>>>>>>>>>>>>>
+							nn { };
 
 	std::mt19937 rng;
 
@@ -55,9 +46,9 @@ struct model {
 		nn.save(path);
 	}
 
-	auto train_all (const int epochs, const std::array<double, 3> dropout_ratios = {0.5, 0.5, 0.5}) {
+	auto train_all (const int epochs, const std::array<float, 3> dropout_ratios = {0.5, 0.5, 0.5}) {
 		
-		double best_validation_loss { std::numeric_limits<double>::max() };
+		float best_validation_loss { std::numeric_limits<float>::max() };
 		constexpr int jump = 16;
 		static_assert(jump % 4 == 0);
 
@@ -68,12 +59,12 @@ struct model {
 
 			std::shuffle(begin(train_set), end(train_set), rng);
 
-			// double training_loss { };
+			// float training_loss { };
 
 			for (auto i = begin(train_set); i + jump < end(train_set); i += jump) {
-				// auto start = std::chrono::high_resolution_clock::now();
+				auto start = std::chrono::high_resolution_clock::now();
 
-				// double sample_loss { };
+				// float sample_loss { };
 				// std::mutex loss_mutex;
 
 				std::for_each (std::execution::par, i, i + jump, [&](const auto& data) {
@@ -86,8 +77,8 @@ struct model {
 
 				nn.optimize();
 				// std::cout << std::fixed << std::setprecision(3);
-				// auto stop = std::chrono::high_resolution_clock::now();
-				// std::cout << "Avg Time = " << std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count() / (1000.0 * jump) << "ms\t";
+				auto stop = std::chrono::high_resolution_clock::now();
+				std::cout << "Avg Time = " << std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count() / (1000.0 * jump) << "ms\t" << std::endl;
 				// std::cout << "Avg Loss = " << sample_loss / jump << std::endl;
 
 				// training_loss += sample_loss;
@@ -95,7 +86,7 @@ struct model {
 
 			std::cout << "Validating...\n" << std::flush;
 
-			double validation_loss { };
+			float validation_loss { };
 			std::mutex loss_mutex;
 
 			std::for_each (std::execution::par, begin(validation_set), end(validation_set), [&](const auto& data) {
@@ -117,7 +108,7 @@ struct model {
 		}
 	}
 
-	auto train (const std::string train_csv_path, int epochs, double validation_ratio) {
+	auto train (const std::string train_csv_path, int epochs, float validation_ratio) {
 		train_set = load_data(train_csv_path);
 
 		shuffle(train_set.begin(), train_set.end(), rng);
@@ -176,7 +167,7 @@ int main(){
 
     auto train_csv_path = "sample_data/mnist_train_small.csv";
     int epoch_count = 50;
-    double validation_ratio = 0.2;
+    float validation_ratio = 0.2;
 
 	Optimizers::RMSProp::rate = 0.001;
 	Optimizers::RMSProp::eps = 1e-5;

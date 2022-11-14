@@ -5,7 +5,10 @@
 namespace nn {
 
 template<
-	int kKernel, int kPadding, int kStride, class NextLayer
+	int kKernel,
+	int kPadding,
+	int kStride,
+	class NextLayer
 >
 class MaxPool {
 	static_assert(kPadding >= 0 and kKernel > kPadding and kStride > 0);
