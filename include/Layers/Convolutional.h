@@ -9,7 +9,6 @@ template<
 	int kInChannels,
 	int kOutChannels,
 	int kPadding,
-	int kStride,
 	class Optimizer,
 	class NextLayer
 >
@@ -47,14 +46,14 @@ public:
 
 
 	template<uint64_t kInFeatures>
-	auto evaluate (const nn::util::image<kInFeatures, kInChannels>& X, const int label)
+	auto evaluate (const nn::util::image<kInFeatures, kInChannels>& X, const int label) const
 	{
 		return L.evaluate(forward(X), label);
 	}
 
 
 	template<uint64_t kFeatures>
-	auto predict (const nn::util::image<kFeatures, kInChannels>& X)
+	auto predict (const nn::util::image<kFeatures, kInChannels>& X) const
 	{
 		return L.predict(forward(X));
 	}
@@ -119,7 +118,7 @@ private:
 	template<uint64_t N, uint64_t NC, uint64_t K, uint64_t KC>
 	static auto convolve (const nn::util::image<N, NC>& X, const std::array<nn::util::image<K, NC>, KC>& W)
 	{
-		static constexpr int M = (N - K + kStride) / kStride;
+		static constexpr int M = N - K + 1;
 		nn::util::image<M, KC> Y{};
 
 		std::array<std::array<float, K * K * NC>, KC> W_mat{};
@@ -135,7 +134,7 @@ private:
 				for (int g = 0; g < NC; g++)
 					for (int x = 0; x < K; x++)
 						for (int y = 0; y < K; y++)
-							X_mat[y + K * (x + K * g)][i * M + j] = X[g][i * kStride + x][j * kStride + y];
+							X_mat[y + K * (x + K * g)][i * M + j] = X[g][i + x][j + y];
 
 		const auto Y_mat {nn::math::FastMath::mat_mul(W_mat, X_mat)};
 
@@ -155,8 +154,9 @@ private:
 	}
 
 	template<uint64_t kInFeatures>
-	auto forward (const nn::util::image<kInFeatures, kInChannels>& X_unpadded)
+	auto forward (const nn::util::image<kInFeatures, kInChannels>& X_unpadded) const
 	{
+		static_assert(kInFeatures >= kKernel);
 		static constexpr int kOutFeatures = kInFeatures + (kPadding * 2) - kKernel + 1;
 			// auto start = std::chrono::high_resolution_clock::now();
 

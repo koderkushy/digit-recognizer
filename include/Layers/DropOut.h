@@ -47,14 +47,14 @@ public:
 
 
 	template<uint64_t kFeatures, uint64_t kChannels>
-	auto evaluate (const nn::util::image<kFeatures, kChannels>& X, const int label)
+	auto evaluate (const nn::util::image<kFeatures, kChannels>& X, const int label) const
 	{
 		return L.evaluate(X, label);
 	}
 
 
 	template<uint64_t kFeatures, uint64_t kChannels>
-	auto predict (const nn::util::image<kFeatures, kChannels>& X)
+	auto predict (const nn::util::image<kFeatures, kChannels>& X) const
 	{
 		return L.predict(X);
 	}

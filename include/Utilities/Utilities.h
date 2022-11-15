@@ -104,6 +104,40 @@ auto pad (const filter<kFeatures>& X)
 	return std::move(Y);
 }
 
+auto load_labeled_mnist (const std::string csv_path) {
+	if (freopen(csv_path.c_str(), "r", stdin) == NULL)
+		std::cout << "Couldn't open file.\n", exit(0);
+
+	constexpr int N = 28;
+
+	std::vector<std::pair<nn::util::image<N, 1>, int>> set{};
+	std::string s, word;
+
+	while (std::cin >> s) {
+		std::vector<int> s_split{};
+		s_split.reserve(N * N + 1);
+		std::stringstream ss(s);
+
+		while (!ss.eof())
+			getline(ss, word, ','),
+			s_split.push_back(stoi(word));
+
+		if (s_split.size() != N * N + 1)
+			std::cout << "Incorrect file format.\n", exit(0);
+
+		nn::util::image<N, 1> img{};
+		for (int i = 0; i < N; i++)
+			for (int j = 0; j < N; j++)
+				img[0][i][j] = s_split[i * N + j + 1] / 256.0;
+
+		auto &label = s_split[0];
+
+		set.push_back(std::pair(img, label));
+	}
+
+	return std::move(set);
+}
+
 
 } // namespace util
 } // namespace nn

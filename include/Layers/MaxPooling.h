@@ -35,7 +35,7 @@ public:
 	
 
 	template<uint64_t kInFeatures, uint64_t kChannels>
-	auto evaluate (const nn::util::image<kInFeatures, kChannels>& _X, const int label)
+	auto evaluate (const nn::util::image<kInFeatures, kChannels>& _X, const int label) const
 	{
 
 		auto X { nn::util::pad<kInFeatures, kChannels, kPadding>(_X) };
@@ -43,8 +43,8 @@ public:
 	}
 
 
-	template<uint64_t kFeatures, uint64_t kChannels>
-	auto predict (const nn::util::image<kFeatures, kChannels>& X)
+	template<uint64_t kInFeatures, uint64_t kChannels>
+	auto predict (const nn::util::image<kInFeatures, kChannels>& X) const
 	{
 		return L.predict(forward(X));
 	}
@@ -65,7 +65,8 @@ public:
 private:
 
 	template<uint64_t kInFeatures_, uint64_t kChannels>
-	auto forward (const nn::util::image<kInFeatures_, kChannels>& X) {
+	auto forward (const nn::util::image<kInFeatures_, kChannels>& X) const
+	{
 		static constexpr int kOutFeatures = (kInFeatures_ - kKernel + kStride) / kStride;
 
 		nn::util::image<kOutFeatures, kChannels> Y { };

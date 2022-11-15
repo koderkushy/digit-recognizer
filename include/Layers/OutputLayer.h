@@ -20,20 +20,21 @@ public:
 
 	auto recurse (const nn::util::image<1, kClasses>& Y_img, int label)
 	{
-		auto Y { nn::util::array_converted(Y_img) };
+		const auto Y { nn::util::array_converted(Y_img) };
 		return std::pair(nn::util::imagify<1, kClasses, kClasses>(Loss::gradient(Y, label)), Loss::loss(Y, label));
 	}
 	
 
-	auto evaluate (const nn::util::image<1, kClasses>& X, const int label)
+	auto evaluate (const nn::util::image<1, kClasses>& X, const int label) const
 	{
 		return Loss::loss(nn::util::array_converted(X), label);
 	}
 
 
-	auto predict (const nn::util::image<1, kClasses>& X)
+	int predict (const nn::util::image<1, kClasses>& X_img) const
 	{
-		return max_element(X.begin(), X.end()) - X.begin();
+		const auto X { nn::util::array_converted(X_img) };
+		return std::max_element(X.begin(), X.end()) - X.begin();
 	}
 
 
