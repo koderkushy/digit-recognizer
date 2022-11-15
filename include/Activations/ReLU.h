@@ -26,14 +26,14 @@ public:
 
 
 	template<uint64_t kFeatures, uint64_t kChannels>
-	auto evaluate (const nn::util::image<kFeatures, kChannels>& X, const int label)
+	auto evaluate (const nn::util::image<kFeatures, kChannels>& X, const int label) const
 	{
 		return L.evaluate(forward(X), label);
 	}
 
 
 	template<uint64_t kFeatures, uint64_t kChannels>
-	auto predict (const nn::util::image<kFeatures, kChannels>& X)
+	auto predict (const nn::util::image<kFeatures, kChannels>& X) const
 	{
 		return L.predict(forward(X));
 	}
@@ -54,7 +54,7 @@ public:
 private:
 
 	template<uint64_t kFeatures, uint64_t kChannels>
-	auto forward (nn::util::image<kFeatures, kChannels> X)
+	auto forward (nn::util::image<kFeatures, kChannels> X) const
 	{
 
 		for (int f = 0; f < kChannels; f++)
