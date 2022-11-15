@@ -53,6 +53,13 @@ public:
 	}
 
 
+	template<uint64_t kFeatures>
+	auto predict (const nn::util::image<kFeatures, kInChannels>& X)
+	{
+		return L.predict(forward(X));
+	}
+
+
 	auto optimize ()
 	{
 		static std::array<std::array<std::array<std::array<Optimizer, kKernel>, kKernel>, kInChannels>, kOutChannels> W_optimizer { };
@@ -151,6 +158,7 @@ private:
 	auto forward (const nn::util::image<kInFeatures, kInChannels>& X_unpadded)
 	{
 		static constexpr int kOutFeatures = kInFeatures + (kPadding * 2) - kKernel + 1;
+			// auto start = std::chrono::high_resolution_clock::now();
 
 		auto Y { convolve(nn::util::pad<kInFeatures, kInChannels, kPadding>(X_unpadded), W) };
 		
@@ -160,6 +168,10 @@ private:
 				for (int j = 0; j < kOutFeatures; j++)
 					Y[f][i][j] += b[f];
 
+			// auto stop = std::chrono::high_resolution_clock::now();
+
+			// std::cout << "conv fwd = " << std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count() << "ms\n" << std::flush;
+
 		return std::move(Y);
 	}
 
@@ -168,23 +180,40 @@ private:
 	auto backward (const nn::util::image<kInFeatures, kInChannels>& X, const nn::util::image<kOutFeatures, kOutChannels>& grad_Y)
 	{
 		static_assert(kInFeatures == kOutFeatures - kPadding * 2 + kKernel - 1);
+			// auto start = std::chrono::high_resolution_clock::now();
 
 		auto W_flipped { W };
 
-		decltype(W) grad_W { };
-		decltype(b) grad_b { };
+		std::array<nn::util::image<kKernel, kInChannels>, kOutChannels> grad_W { };
+		std::array<float, kOutChannels> grad_b { };
 
 		nn::util::image<kInFeatures, kInChannels> grad_X { };
 
-		// Compute gradients wrt W
-		for (int g = 0; g < kInChannels; g++) {
-			auto X_g { nn::util::pad<kInFeatures, kPadding>(X[g]) };
+		{
+			int g = 0;
+			for (; g + 4 <= kInChannels; g += 4) {
+				const auto X0 { nn::util::pad<kInFeatures, kPadding>(X[g + 0]) };
+				const auto X1 { nn::util::pad<kInFeatures, kPadding>(X[g + 1]) };
+				const auto X2 { nn::util::pad<kInFeatures, kPadding>(X[g + 2]) };
+				const auto X3 { nn::util::pad<kInFeatures, kPadding>(X[g + 3]) };
+#pragma GCC ivdep
+				for (int f = 0; f < kOutChannels; f++) {
+					grad_W[f][g + 0] = convolve(X0, grad_Y[f])[0];
+					grad_W[f][g + 1] = convolve(X1, grad_Y[f])[0];
+					grad_W[f][g + 2] = convolve(X2, grad_Y[f])[0];
+					grad_W[f][g + 3] = convolve(X3, grad_Y[f])[0];
+				}
+			}
 
-			for (int f = 0; f < kOutChannels; f++)
-				grad_W[f][g] = convolve(X_g, grad_Y[f])[0];
+			for (; g < kInChannels; g++) {
+				const auto X_g { nn::util::pad<kInFeatures, kPadding>(X[g]) };
+#pragma GCC ivdep
+				for (int f = 0; f < kOutChannels; f++)
+					grad_W[f][g] = convolve(X_g, grad_Y[f])[0];
+			}
+			
 		}
 
-		// Flip W
 		for (int f = 0; f < kOutChannels; f++)
 			for (int g = 0; g < kInChannels; g++)
 				for (int i = 0; i < kKernel; i++) {
@@ -193,12 +222,11 @@ private:
 					std::reverse(W_flipped[f][g].begin(), W_flipped[f][g].end());
 				}
 
-		// Compute gradients wrt X
 		auto grad_Y_padded { nn::util::pad<kOutFeatures, kOutChannels, kKernel - 1>(grad_Y) };
 
 		for (int g = 0; g < kInChannels; g++) {
 			for (int f = 0; f < kOutChannels; f++) {
-				auto component {convolve(grad_Y_padded[f], W_flipped[f][g])[0]};
+				const auto component {convolve(grad_Y_padded[f], W_flipped[f][g])[0]};
 
 				for (int i = 0; i < kInFeatures; i++)
 #pragma GCC ivdep
@@ -207,14 +235,12 @@ private:
 			}
 		}
 
-		// Compute gradients wrt b
 		for (int f = 0; f < kOutChannels; f++)
 			for (int i = 0; i < kOutFeatures; i++)
 #pragma GCC ivdep
 				for (int j = 0; j < kOutFeatures; j++)
 					grad_b[f] += grad_Y[f][i][j];
 
-		// Acquire mutex and accumulate gradients
 		{
 			std::lock_guard<std::mutex> lock(grad_mutex);
 
@@ -230,6 +256,10 @@ private:
 			for (int f = 0; f < kOutChannels; f++)
 				grad_b_accumulate[f] += grad_b[f];
 		}
+
+			// auto stop = std::chrono::high_resolution_clock::now();
+
+			// std::cout << "conv bwd = " << std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count() << "ms\n" << std::flush;
 
 		return std::move(grad_X);
 	}

@@ -18,20 +18,22 @@ public:
 	}
 
 
-	template<uint64_t kFeatures, uint64_t kChannels>
-	auto recurse (const nn::util::image<kFeatures, kChannels>& Y_img, int label)
+	auto recurse (const nn::util::image<1, kClasses>& Y_img, int label)
 	{
-		static_assert(kFeatures == 1 and kChannels == kClasses);
 		auto Y { nn::util::array_converted(Y_img) };
 		return std::pair(nn::util::imagify<1, kClasses, kClasses>(Loss::gradient(Y, label)), Loss::loss(Y, label));
 	}
 	
 
-	template<uint64_t kFeatures, uint64_t kChannels>
-	auto evaluate (const nn::util::image<kFeatures, kChannels>& X, const int label)
+	auto evaluate (const nn::util::image<1, kClasses>& X, const int label)
 	{
-		static_assert(kFeatures == 1 and kChannels == kClasses);
 		return Loss::loss(nn::util::array_converted(X), label);
+	}
+
+
+	auto predict (const nn::util::image<1, kClasses>& X)
+	{
+		return max_element(X.begin(), X.end()) - X.begin();
 	}
 
 

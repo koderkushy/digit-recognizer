@@ -32,6 +32,13 @@ public:
 	}
 
 
+	template<uint64_t kFeatures, uint64_t kChannels>
+	auto predict (const nn::util::image<kFeatures, kChannels>& X)
+	{
+		return L.predict(forward(X));
+	}
+
+
 	auto optimize ()
 	{
 		L.optimize();

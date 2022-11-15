@@ -46,6 +46,13 @@ public:
 	}
 
 
+	template<uint64_t kFeatures, uint64_t kChannels>
+	auto predict (const nn::util::image<kFeatures, kChannels>& X)
+	{
+		return L.predict(forward(X));
+	}
+
+
 	auto optimize ()
 	{
 		static std::array<std::array<Optimizer, kInWidth>, kOutWidth> W_optimizer { };
@@ -100,7 +107,7 @@ private:
 	{
 
 		static_assert(kFeatures * kFeatures * kChannels == kInWidth);
-			// auto start = chrono::high_resolution_clock::now();
+			// auto start = std::chrono::high_resolution_clock::now();
 
 		auto arr_X { nn::util::array_converted(X) };
 		std::array<float, kOutWidth> arr_Y { b };
@@ -110,8 +117,8 @@ private:
 			for (int j = 0; j < kOutWidth; j++)
 				arr_Y[j] += W[i][j] * arr_X[i];
 
-			// auto stop = chrono::high_resolution_clock::now();
-			// cout << "fcon = " << chrono::duration_cast<chrono::milliseconds>(stop - start).count() << "ms\n" << flush;
+			// auto stop = std::chrono::high_resolution_clock::now();
+			// std::cout << "fcon fwd = " << std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count() << "ms\n" << std::flush;
 
 		return nn::util::imagify<1, kOutWidth, kOutWidth>(arr_Y);
 	}
@@ -120,21 +127,33 @@ private:
 	template<uint64_t kFeatures, uint64_t kChannels>
 	auto backward (const nn::util::image<kFeatures, kChannels>& X, const nn::util::image<1, kOutWidth>& grad_Y)
 	{
+
+			// auto start = std::chrono::high_resolution_clock::now();
+
 		auto arr_grad_Y { nn::util::array_converted(grad_Y) };
 		auto arr_X { nn::util::array_converted(X) };
 
 		std::array<float, kInWidth> arr_grad_X { };
-		decltype(W) grad_W { };
 
-		// Computing gradients wrt b
 		const auto& grad_b { arr_grad_Y };
 
-		// Computing gradients wrt X, W
-		for (int i = 0; i < kInWidth; i++)
+		{
+			int i = 0;
+			for (; i + 4 <= kInWidth; i += 4) {
 #pragma GCC ivdep
-			for (int j = 0; j < kOutWidth; j++)
-				arr_grad_X[i] += arr_grad_Y[j] * W[i][j],
-				grad_W[i][j] = arr_grad_Y[j] * arr_X[i];
+				for (int j = 0; j < kOutWidth; j++) {
+					arr_grad_X[i + 0] += arr_grad_Y[j] * W[i + 0][j];
+					arr_grad_X[i + 1] += arr_grad_Y[j] * W[i + 1][j];
+					arr_grad_X[i + 2] += arr_grad_Y[j] * W[i + 2][j];
+					arr_grad_X[i + 3] += arr_grad_Y[j] * W[i + 3][j];
+				}
+			}
+
+			for (; i < kInWidth; i++)
+#pragma GCC ivdep
+				for (int j = 0; j < kOutWidth; j++)
+					arr_grad_X[i] += arr_grad_Y[j] * W[i][j];
+		}
 
 		{
 			std::lock_guard<std::mutex> lock(grad_mutex);
@@ -145,11 +164,28 @@ private:
 			for (int i = 0; i < kOutWidth; i++)
 				grad_b_accumulate[i] += grad_b[i];
 
-			for (int i = 0; i < kInWidth; i++)
+			{
+				int i = 0;
+				for (; i + 4 <= kInWidth; i += 4) {
 #pragma GCC ivdep
-				for (int j = 0; j < kOutWidth; j++)
-					grad_W_accumulate[i][j] += grad_W[i][j];
+					for (int j = 0; j < kOutWidth; j++) {
+						grad_W_accumulate[i + 0][j] += arr_grad_Y[j] * arr_X[i + 0];
+						grad_W_accumulate[i + 1][j] += arr_grad_Y[j] * arr_X[i + 1];
+						grad_W_accumulate[i + 2][j] += arr_grad_Y[j] * arr_X[i + 2];
+						grad_W_accumulate[i + 3][j] += arr_grad_Y[j] * arr_X[i + 3];
+					}
+				}
+
+				for (; i < kInWidth; i++)
+#pragma GCC ivdep
+					for (int j = 0; j < kOutWidth; j++)
+						grad_W_accumulate[i][j] += arr_grad_Y[j] * arr_X[i];
+			}
 		}
+
+			// auto stop = std::chrono::high_resolution_clock::now();
+
+			// std::cout << "fcon bwd = " << std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count() << "ms\n" << std::flush;
 
 		return nn::util::imagify<kFeatures, kChannels, kInWidth>(arr_grad_X);
 	}

@@ -161,6 +161,12 @@ struct model {
 
 		return std::move(set);
 	}
+
+	int predict (const nn::util::filter<28>& x) {
+		return nn.predict(x);
+	}
+
+	
 };
 
 int main(){
