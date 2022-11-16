@@ -24,8 +24,8 @@ public:
 	template<uint64_t kInFeatures, uint64_t kChannels>
 	auto recurse (const nn::util::image<kInFeatures, kChannels>& _X, const int label)
 	{
-		static constexpr int kInFeatures_ = kInFeatures + 2 * kPadding;
-		static constexpr int kOutFeatures = (kInFeatures_ - kKernel + kStride) / kStride;
+		static constexpr int kInFeaturesPadded = kInFeatures + 2 * kPadding;
+		static constexpr int kOutFeatures = (kInFeaturesPadded - kKernel + kStride) / kStride;
 
 		auto X { nn::util::pad<kInFeatures, kChannels, kPadding>(_X) };
 
@@ -37,15 +37,15 @@ public:
 	template<uint64_t kInFeatures, uint64_t kChannels>
 	auto evaluate (const nn::util::image<kInFeatures, kChannels>& _X, const int label) const
 	{
-
 		auto X { nn::util::pad<kInFeatures, kChannels, kPadding>(_X) };
 		return L.evaluate(forward(X), label);
 	}
 
 
 	template<uint64_t kInFeatures, uint64_t kChannels>
-	auto predict (const nn::util::image<kInFeatures, kChannels>& X) const
+	auto predict (const nn::util::image<kInFeatures, kChannels>& _X) const
 	{
+		auto X { nn::util::pad<kInFeatures, kChannels, kPadding>(_X) };
 		return L.predict(forward(X));
 	}
 
@@ -64,16 +64,16 @@ public:
 
 private:
 
-	template<uint64_t kInFeatures_, uint64_t kChannels>
-	auto forward (const nn::util::image<kInFeatures_, kChannels>& X) const
+	template<uint64_t kInFeaturesPadded, uint64_t kChannels>
+	auto forward (const nn::util::image<kInFeaturesPadded, kChannels>& X) const
 	{
-		static constexpr int kOutFeatures = (kInFeatures_ - kKernel + kStride) / kStride;
+		static constexpr int kOutFeatures = (kInFeaturesPadded - kKernel) / kStride + 1;
 
 		nn::util::image<kOutFeatures, kChannels> Y { };
 
 		for (int c = 0; c < kChannels; c++)
-			for (int i = 0; i + kKernel <= kInFeatures_; i += kStride)
-				for (int j = 0; j + kKernel <= kInFeatures_; j += kStride) {
+			for (int i = 0; i + kKernel <= kInFeaturesPadded; i += kStride)
+				for (int j = 0; j + kKernel <= kInFeaturesPadded; j += kStride) {
 					Y[c][i / kStride][j / kStride] = X[c][i][j];
 
 					for (int x = 0; x < kKernel; x++)
@@ -85,16 +85,16 @@ private:
 	}
 
 
-	template<uint64_t kInFeatures_, uint64_t kOutFeatures, uint64_t kChannels>
-	auto backward (const nn::util::image<kInFeatures_, kChannels>& X, const nn::util::image<kOutFeatures, kChannels>& grad_Y)
+	template<uint64_t kInFeaturesPadded, uint64_t kOutFeatures, uint64_t kChannels>
+	auto backward (const nn::util::image<kInFeaturesPadded, kChannels>& X, const nn::util::image<kOutFeatures, kChannels>& grad_Y)
 	{
-		static_assert(kOutFeatures == (kInFeatures_ - kKernel + kStride) / kStride);
+		static_assert(kOutFeatures == (kInFeaturesPadded - kKernel) / kStride + 1);
 
-		nn::util::image<kInFeatures_, kChannels> grad_X { };
+		nn::util::image<kInFeaturesPadded, kChannels> grad_X { };
 
 		for (int c = 0; c < kChannels; c++)
-			for (int i = 0; i + kKernel <= kInFeatures_; i += kStride)
-				for (int j = 0; j + kKernel <= kInFeatures_; j += kStride) {
+			for (int i = 0; i + kKernel <= kInFeaturesPadded; i += kStride)
+				for (int j = 0; j + kKernel <= kInFeaturesPadded; j += kStride) {
 					auto v = X[c][i][j];
 
 					for (int x = 0; x < kKernel; x++)
@@ -106,7 +106,7 @@ private:
 								grad_X[c][i + x][j + y] += grad_Y[c][i / kStride][j / kStride];
 				}
 
-		return nn::util::pad<kInFeatures_, kChannels, -kPadding>(grad_X);
+		return nn::util::pad<kInFeaturesPadded, kChannels, -kPadding>(grad_X);
 	}
 
 
