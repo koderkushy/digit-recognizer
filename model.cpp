@@ -33,7 +33,7 @@ struct MnistDigitRecogniser {
 	using image28 = nn::util::image<28, 1>;
 
 	auto save () { nn.save("data/model.txt"); }
-	// auto predict (const image28& x) { return nn.predict(x); }
+	auto predict (const image28& x) { return nn.predict(x); }
 	// auto recurse (const image28& x, int label) { return nn.recurse(x, label); }
 	// auto evaluate (const image28& x, int label) { return nn.evaluate(x, label); }
 	// auto optimize () { nn.optimize(); }
@@ -127,19 +127,19 @@ int main(){
 
 	std::mt19937 rng(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
-	auto train_set = nn::util::load_labeled_mnist("sample_data/mnist_train_small.csv");
+	auto train_set = nn::util::load_labeled_mnist("sample_data/train.csv");
 	std::shuffle(begin(train_set), end(train_set), rng);
 
-	auto test_set = std::vector(end(train_set) - 0.2 * train_set.size(), end(train_set));
-	train_set.erase(end(train_set) - 0.2 * train_set.size(), end(train_set));
-
-	// auto val_set = std::vector(end(train_set) - 0.2 * train_set.size(), end(train_set));
+	// auto test_set = std::vector(end(train_set) - 0.2 * train_set.size(), end(train_set));
 	// train_set.erase(end(train_set) - 0.2 * train_set.size(), end(train_set));
+
+	auto val_set = std::vector(end(train_set) - 0.2 * train_set.size(), end(train_set));
+	train_set.erase(end(train_set) - 0.2 * train_set.size(), end(train_set));
 
 
 	std::cout << "Training set has " << train_set.size() << " images\n";
-	// std::cout << "Validation set has " << val_set.size() << " images\n";
-	std::cout << "Test set has " << test_set.size() << " images\n" << std::endl;
+	std::cout << "Validation set has " << val_set.size() << " images\n";
+	// std::cout << "Test set has " << test_set.size() << " images\n" << std::endl;
 
 
 	float least_val_loss = std::numeric_limits<float>::max();
@@ -147,15 +147,35 @@ int main(){
 	for (int epoch = 0; epoch < 5; epoch++) {
 		std::cout << "Epoch " << epoch + 1 << std::endl;
 
-		model.train(train_set, 32);
+		std::shuffle(begin(train_set), end(train_set), rng);
+
+		model.train(train_set, 64);
 
 		// if (model.validate(val_set) < least_val_loss)
 		// 	model.save();
 
-		std::cout << "Accuracy " << model.test(test_set) << " %" << std::endl;
+		std::cout << "Accuracy " << model.test(val_set) << " %" << std::endl;
 	}
 
+	auto test_set = nn::util::load_unlabeled_mnist("sample_data/test.csv");
 
+	std::cout << "Test set has " << test_set.size() << " images" << std::endl;
 
+	std::vector predictions(test_set.size(), 0);
+	std::vector iota(test_set.size(), 0);
+
+	std::iota(begin(iota), end(iota), 0);
+
+	std::for_each(std::execution::par, begin(iota), end(iota), [&](const int i) {
+		predictions[i] = model.predict(test_set[i]);
+	});
+
+	std::ofstream out("sample_data/predictions.csv");
+
+	out << "ImageId" << ',' << "Label" << '\n';
+
+	for (int i = 0; i < predictions.size(); i++) {
+		out << i + 1 << ',' << predictions[i] << '\n';
+	}
 
 }

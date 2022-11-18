@@ -105,15 +105,14 @@ auto pad (const filter<kFeatures>& X)
 }
 
 auto load_labeled_mnist (const std::string csv_path) {
-	if (freopen(csv_path.c_str(), "r", stdin) == NULL)
-		std::cout << "Couldn't open file.\n", exit(0);
+	std::ifstream in(csv_path.c_str());
 
 	constexpr int N = 28;
 
 	std::vector<std::pair<nn::util::image<N, 1>, int>> set{};
 	std::string s, word;
 
-	while (std::cin >> s) {
+	while (in >> s) {
 		std::vector<int> s_split{};
 		s_split.reserve(N * N + 1);
 		std::stringstream ss(s);
@@ -133,6 +132,38 @@ auto load_labeled_mnist (const std::string csv_path) {
 		auto &label = s_split[0];
 
 		set.push_back(std::pair(img, label));
+	}
+
+	return std::move(set);
+}
+
+auto load_unlabeled_mnist (const std::string csv_path) {	
+	std::ifstream in(csv_path.c_str());
+
+	constexpr int N = 28;
+
+	std::vector<nn::util::image<N, 1>> set{};
+	std::string s, word;
+
+	while (in >> s) {
+		std::vector<int> s_split{};
+		s_split.reserve(N * N);
+		std::stringstream ss(s);
+
+		while (!ss.eof())
+			getline(ss, word, ','),
+			s_split.push_back(stoi(word));
+
+		if (s_split.size() != N * N)
+			std::cout << "Incorrect file format.\n", exit(0);
+
+		nn::util::image<N, 1> img{};
+
+		for (int i = 0; i < N; i++)
+			for (int j = 0; j < N; j++)
+				img[0][i][j] = s_split[i * N + j] / 256.0;
+
+		set.push_back(img);
 	}
 
 	return std::move(set);
