@@ -1,21 +1,22 @@
 #ifndef NN_OPERATIONS_FASTMATH_H_
 #define NN_OPERATIONS_FASTMATH_H_
 
+using uint = long unsigned int;
 
 namespace nn {
 namespace math {
 
 struct FastMath {
-	static constexpr int MAX_WIDTH = 2048;
+	static constexpr uint MAX_WIDTH = 2048;
 	static float buf0 alignas(64) [MAX_WIDTH];
 	static float buf1 alignas(64) [MAX_WIDTH];
 	static float buf2 alignas(64) [MAX_WIDTH];
 	static float buf3 alignas(64) [MAX_WIDTH];
 
-	template<int N, int M>
+	template<uint N, uint M>
 	using mat = std::array<std::array<float, M>, N>;
 
-	template<uint64_t N, uint64_t M, uint64_t K>
+	template<uint N, uint M, uint K>
 	static auto fast_mat_mul (const mat<N, M>& A, const mat<M, K>& B, mat<N, K>& C) {
 
 		static_assert(K <= MAX_WIDTH);
@@ -90,7 +91,7 @@ struct FastMath {
 		
 	}
 
-	template<uint64_t M, uint64_t N, uint64_t K>
+	template<uint N, uint M, uint K>
 	static auto mat_mul (const std::array<std::array<float, N>, M>& A, const std::array<std::array<float, K>, N>& B) {
 		std::array<std::array<float, K>, M> C {};
 

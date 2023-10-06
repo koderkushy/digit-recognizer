@@ -5,7 +5,10 @@
 namespace nn {
 
 template<
-	int kPercent, class NextLayer
+	int kSize,
+	int kChannels,
+	int kPercent,
+	class NextLayer
 >
 class DropOut {
 
@@ -21,40 +24,37 @@ public:
 	}
 
 
-	template<uint64_t kFeatures, uint64_t kChannels>
-	auto recurse (nn::util::image<kFeatures, kChannels> X, const int label)
+	auto recurse (nn::util::image<kSize, kChannels> X, const int label)
 	{
-		std::array<bool, kFeatures * kFeatures * kChannels> mask { };
+		std::array<bool, kSize * kSize * kChannels> mask { };
 
 		for (auto& b: mask)
 			b = (rng() > kPercent * R / 100.0);
 
 		for (int f = 0; f < kChannels; f++)
-			for (int i = 0; i < kFeatures; i++)
-				for (int j = 0; j < kFeatures; j++)
-					X[f][i][j] *= mask[(f * kFeatures + i) * kFeatures + j];
+			for (int i = 0; i < kSize; i++)
+				for (int j = 0; j < kSize; j++)
+					X[f][i][j] *= mask[(f * kSize + i) * kSize + j];
 
 		auto [gradient, loss] = L.recurse(X, label);
 
 		for (int f = 0; f < kChannels; f++)
-			for (int i = 0; i < kFeatures; i++)
-				for (int j = 0; j < kFeatures; j++)
-					gradient[f][i][j] *= mask[(f * kFeatures + i) * kFeatures + j];
+			for (int i = 0; i < kSize; i++)
+				for (int j = 0; j < kSize; j++)
+					gradient[f][i][j] *= mask[(f * kSize + i) * kSize + j];
 
 		return std::pair(std::move(gradient), loss);
 
 	}
 
 
-	template<uint64_t kFeatures, uint64_t kChannels>
-	auto evaluate (const nn::util::image<kFeatures, kChannels>& X, const int label) const
+	auto evaluate (const nn::util::image<kSize, kChannels>& X, const int label) const
 	{
 		return L.evaluate(X, label);
 	}
 
 
-	template<uint64_t kFeatures, uint64_t kChannels>
-	auto predict (const nn::util::image<kFeatures, kChannels>& X) const
+	auto predict (const nn::util::image<kSize, kChannels>& X) const
 	{
 		return L.predict(X);
 	}

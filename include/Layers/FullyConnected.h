@@ -5,12 +5,14 @@
 namespace nn {
 
 template<
-	int kInWidth,
+	int kFeatures,
+	int kChannels,
 	int kOutWidth,
 	class Optimizer,
 	class NextLayer
 >
 class FullyConnected {
+	static constexpr int kInWidth = kFeatures * kFeatures * kChannels;
 
 public:
 
@@ -31,7 +33,6 @@ public:
 	}
 
 
-	template<uint64_t kFeatures, uint64_t kChannels>
 	auto recurse (const nn::util::image<kFeatures, kChannels>& X, const int label)
 	{
 		const auto [gradient, loss] = L.recurse(forward(X), label);
@@ -39,14 +40,12 @@ public:
 	}
 
 
-	template<uint64_t kFeatures, uint64_t kChannels>
 	auto evaluate (const nn::util::image<kFeatures, kChannels>& X, const int label) const
 	{
 		return L.evaluate(forward(X), label);
 	}
 
 
-	template<uint64_t kFeatures, uint64_t kChannels>
 	auto predict (const nn::util::image<kFeatures, kChannels>& X) const
 	{
 		return L.predict(forward(X));
@@ -102,11 +101,9 @@ public:
 
 private:
 
-	template<uint64_t kFeatures, uint64_t kChannels>
 	auto forward (const nn::util::image<kFeatures, kChannels>& X) const
 	{
 
-		static_assert(kFeatures * kFeatures * kChannels == kInWidth);
 			// auto start = std::chrono::high_resolution_clock::now();
 
 		auto arr_X { nn::util::array_converted(X) };
@@ -124,7 +121,6 @@ private:
 	}
 
 
-	template<uint64_t kFeatures, uint64_t kChannels>
 	auto backward (const nn::util::image<kFeatures, kChannels>& X, const nn::util::image<1, kOutWidth>& grad_Y)
 	{
 

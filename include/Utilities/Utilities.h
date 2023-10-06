@@ -1,19 +1,20 @@
 #ifndef NN_TRIVIAL_H_
 #define NN_TRIVIAL_H_
 
+using uint = long unsigned int;
 
 namespace nn {
 namespace util {
 
-template<int kFeatures>
+template<uint kFeatures>
 using filter = std::array<std::array<float, kFeatures>, kFeatures>;
 
 
-template<int kFeatures, int kChannels>
+template<uint kFeatures, uint kChannels>
 using image = std::array<filter<kFeatures>, kChannels>;
 
 
-template<uint64_t kFeatures, uint64_t kChannels>
+template<uint kFeatures, uint kChannels>
 auto copy_to_vector (const image<kFeatures, kChannels>& X, std::vector<float>& V)
 {
 	V.clear(), V.reserve(kFeatures * kFeatures * kChannels);
@@ -25,7 +26,7 @@ auto copy_to_vector (const image<kFeatures, kChannels>& X, std::vector<float>& V
 }
 
 
-template<uint64_t kFeatures, uint64_t kChannels>
+template<uint kFeatures, uint kChannels>
 auto array_converted (const image<kFeatures, kChannels>& X)
 {
 	std::array<float, kFeatures * kFeatures * kChannels> Y{};
@@ -37,7 +38,7 @@ auto array_converted (const image<kFeatures, kChannels>& X)
 }
 
 
-template<uint64_t kFeatures, uint64_t kChannels, uint64_t kIn>
+template<uint kFeatures, uint kChannels, uint kIn>
 auto imagify (const std::array<float, kIn>& X)
 {
 	static_assert(kIn == kFeatures * kFeatures * kChannels);
@@ -52,7 +53,7 @@ auto imagify (const std::array<float, kIn>& X)
 }
 
 
-template<uint64_t kFeatures, uint64_t kChannels>
+template<uint kFeatures, uint kChannels>
 auto imagify (const std::vector<float>& V)
 {
 	assert(kFeatures * kFeatures * kChannels == V.size());

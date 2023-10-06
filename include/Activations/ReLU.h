@@ -5,6 +5,8 @@
 namespace nn {
 
 template<
+	int kFeatures,
+	int kChannels,
 	class NextLayer
 >
 class ReLU {
@@ -17,7 +19,6 @@ public:
 	}
 
 
-	template<uint64_t kFeatures, uint64_t kChannels>
 	auto recurse (nn::util::image<kFeatures, kChannels> X, const int label)
 	{
 		auto [gradient, loss] = L.recurse(forward(X), label);
@@ -25,14 +26,12 @@ public:
 	}
 
 
-	template<uint64_t kFeatures, uint64_t kChannels>
 	auto evaluate (const nn::util::image<kFeatures, kChannels>& X, const int label) const
 	{
 		return L.evaluate(forward(X), label);
 	}
 
 
-	template<uint64_t kFeatures, uint64_t kChannels>
 	auto predict (const nn::util::image<kFeatures, kChannels>& X) const
 	{
 		return L.predict(forward(X));
@@ -53,7 +52,6 @@ public:
 
 private:
 
-	template<uint64_t kFeatures, uint64_t kChannels>
 	auto forward (nn::util::image<kFeatures, kChannels> X) const
 	{
 
@@ -67,7 +65,6 @@ private:
 	}
 
 
-	template<uint64_t kFeatures, uint64_t kChannels>
 	auto backward (const nn::util::image<kFeatures, kChannels>& X, const nn::util::image<kFeatures, kChannels>& grad_Y)
 	{
 		nn::util::image<kFeatures, kChannels> grad_X{};

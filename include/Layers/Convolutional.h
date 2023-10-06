@@ -1,19 +1,22 @@
 #ifndef NN_CONVOLUTIONAL_LAYER_H_
 #define NN_CONVOLUTIONAL_LAYER_H_
 
+using uint = long unsigned int;
 
 namespace nn {
 
 template<
-	int kKernel,
+	int kInFeatures,
 	int kInChannels,
-	int kOutChannels,
+	int kKernel,
 	int kPadding,
+	int kOutChannels,
 	class Optimizer,
 	class NextLayer
 >
 class Convolutional {
-
+	static constexpr int kPaddedSize = kInFeatures + 2 * kPadding;
+	static constexpr int kOutFeatures = kPaddedSize - kKernel + 1;
 public:
 
 	Convolutional ()
@@ -36,7 +39,6 @@ public:
 	}
 
 
-	template<uint64_t kInFeatures>
 	auto recurse (const nn::util::image<kInFeatures, kInChannels>& X, const int label)
 	{
 		const auto [gradient, loss] = L.recurse(forward(X), label);
@@ -45,15 +47,13 @@ public:
 	}
 
 
-	template<uint64_t kInFeatures>
 	auto evaluate (const nn::util::image<kInFeatures, kInChannels>& X, const int label) const
 	{
 		return L.evaluate(forward(X), label);
 	}
 
 
-	template<uint64_t kFeatures>
-	auto predict (const nn::util::image<kFeatures, kInChannels>& X) const
+	auto predict (const nn::util::image<kInFeatures, kInChannels>& X) const
 	{
 		return L.predict(forward(X));
 	}
@@ -115,7 +115,7 @@ public:
 
 private:
 
-	template<uint64_t N, uint64_t NC, uint64_t K, uint64_t KC>
+	template<uint N, uint NC, uint K, uint KC>
 	static auto convolve (const nn::util::image<N, NC>& X, const std::array<nn::util::image<K, NC>, KC>& W)
 	{
 		static constexpr int M = N - K + 1;
@@ -136,7 +136,7 @@ private:
 						for (int y = 0; y < K; y++)
 							X_mat[y + K * (x + K * g)][i * M + j] = X[g][i + x][j + y];
 
-		const auto Y_mat {nn::math::FastMath::mat_mul(W_mat, X_mat)};
+		const auto Y_mat {nn::math::FastMath::mat_mul<K * K * NC, KC, M * M>(W_mat, X_mat)};
 
 		for (int f = 0; f < KC; f++)
 			Y[f] = nn::util::imagify<M, 1, M * M>(Y_mat[f])[0];
@@ -144,7 +144,7 @@ private:
 		return std::move(Y);
 	}
 
-	template<uint64_t N, uint64_t K>
+	template<uint N, uint K>
 	static auto convolve (const nn::util::filter<N>& X, const nn::util::filter<K>& W)
 	{
 		nn::util::image<N, 1> _X{};
@@ -153,14 +153,13 @@ private:
 		return convolve(_X, _W);
 	}
 
-	template<uint64_t kInFeatures>
 	auto forward (const nn::util::image<kInFeatures, kInChannels>& X_unpadded) const
 	{
 		static_assert(kInFeatures >= kKernel);
-		static constexpr int kOutFeatures = kInFeatures + (kPadding * 2) - kKernel + 1;
 			// auto start = std::chrono::high_resolution_clock::now();
 
-		auto Y { convolve(nn::util::pad<kInFeatures, kInChannels, kPadding>(X_unpadded), W) };
+		auto X = nn::util::pad<kInFeatures, kInChannels, kPadding>(X_unpadded);
+		auto Y { convolve<kPaddedSize, kInChannels, kKernel, kOutChannels>(X, W) };
 		
 		for (int f = 0; f < kOutChannels; f++)
 			for (int i = 0; i < kOutFeatures; i++)
@@ -176,10 +175,8 @@ private:
 	}
 
 
-	template<uint64_t kInFeatures, uint64_t kOutFeatures>
 	auto backward (const nn::util::image<kInFeatures, kInChannels>& X, const nn::util::image<kOutFeatures, kOutChannels>& grad_Y)
 	{
-		static_assert(kInFeatures == kOutFeatures - kPadding * 2 + kKernel - 1);
 			// auto start = std::chrono::high_resolution_clock::now();
 
 		auto W_flipped { W };

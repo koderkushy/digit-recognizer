@@ -1,5 +1,5 @@
-#pragma GCC optimize("O3,unroll-loops")
-#pragma GCC target("avx2")
+// #pragma GCC optimize("O3,unroll-loops")
+// #pragma GCC target("avx2")
 
 #include "bits/stdc++.h"
 #include <execution>
@@ -53,6 +53,8 @@ struct MnistDigitRecogniser {
 				// std::lock_guard<std::mutex> lock(mut);
 				// batch_loss += loss;
 			});
+
+			std::cout << (i-begin(train_set)) / double(train_set.size()) << " completed\n" << std::flush;
 
 			nn.optimize();
 			// auto stop = std::chrono::high_resolution_clock::now();
@@ -111,23 +113,28 @@ int main(){
   
 	using Optimizer = nn::Optimizers::RmsProp<RmsPropParams>;
 
-
 	MnistDigitRecogniser<
-		nn::Convolutional<3, 1, 32, 0, Optimizer, nn::ReLU<
-		nn::Convolutional<3, 32, 32, 0, Optimizer, nn::ReLU<nn::MaxPool<3, 0, 2, nn::DropOut<50,
-		nn::Convolutional<3, 32, 32, 0, Optimizer, nn::ReLU<
-		nn::Convolutional<3, 32, 64, 0, Optimizer, nn::ReLU<nn::MaxPool<2, 0, 1, nn::DropOut<50,
-		nn::Convolutional<3, 64, 64, 1, Optimizer, nn::ReLU<
-		nn::Convolutional<3, 64, 128, 1, Optimizer, nn::ReLU<
-		nn::Convolutional<3, 128, 128, 1, Optimizer, nn::ReLU<
-		nn::Convolutional<3, 128, 128, 1, Optimizer, nn::ReLU<nn::MaxPool<2, 0, 1, nn::DropOut<50,
-		nn::FullyConnected<5 * 5 * 128, 2048, Optimizer, nn::ReLU<
-		nn::FullyConnected<2048, 10, Optimizer, nn::OutputLayer<10, LossFunctions::CrossEntropy>>>>>>>>>>>>>>>>>>>>>>>>>>
-	> model{ };
+		nn::Convolutional<28, 1, 3, 0, 16, Optimizer,
+		nn::ReLU<26, 16,
+		nn::Convolutional<26, 16, 3, 0, 16, Optimizer,
+		nn::ReLU<24, 16,
+		nn::MaxPool<24, 16, 3, 0, 2,
+		nn::DropOut<11, 16, 50,
+		nn::Convolutional<11, 16, 5, 1, 32, Optimizer,
+		nn::ReLU<9, 32,
+		nn::Convolutional<9, 32, 5, 0, 32, Optimizer,
+		nn::ReLU<5, 32,
+		nn::MaxPool<5, 32, 2, 0, 1,
+		nn::DropOut<4, 32, 50,
+		nn::FullyConnected<4, 32, 256, Optimizer,
+		nn::ReLU<1, 256,
+		nn::FullyConnected<1, 256, 10, Optimizer,
+		nn::OutputLayer<10, LossFunctions::CrossEntropy
+	>>>>>>>>>>>>>>>>> model{ };
 
 	std::mt19937 rng(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
-	auto train_set = nn::util::load_labeled_mnist("sample_data/train.csv");
+	auto train_set = nn::util::load_labeled_mnist("sample_data/mnist_train_small.csv");
 	std::shuffle(begin(train_set), end(train_set), rng);
 
 	// auto test_set = std::vector(end(train_set) - 0.2 * train_set.size(), end(train_set));
@@ -157,25 +164,25 @@ int main(){
 		std::cout << "Accuracy " << model.test(val_set) << " %" << std::endl;
 	}
 
-	auto test_set = nn::util::load_unlabeled_mnist("sample_data/test.csv");
+	// auto test_set = nn::util::load_unlabeled_mnist("sample_data/test.csv");
 
-	std::cout << "Test set has " << test_set.size() << " images" << std::endl;
+	// std::cout << "Test set has " << test_set.size() << " images" << std::endl;
 
-	std::vector predictions(test_set.size(), 0);
-	std::vector iota(test_set.size(), 0);
+	// std::vector predictions(test_set.size(), 0);
+	// std::vector iota(test_set.size(), 0);
 
-	std::iota(begin(iota), end(iota), 0);
+	// std::iota(begin(iota), end(iota), 0);
 
-	std::for_each(std::execution::par, begin(iota), end(iota), [&](const int i) {
-		predictions[i] = model.predict(test_set[i]);
-	});
+	// std::for_each(std::execution::par, begin(iota), end(iota), [&](const int i) {
+	// 	predictions[i] = model.predict(test_set[i]);
+	// });
 
-	std::ofstream out("sample_data/predictions.csv");
+	// std::ofstream out("sample_data/predictions.csv");
 
-	out << "ImageId" << ',' << "Label" << '\n';
+	// out << "ImageId" << ',' << "Label" << '\n';
 
-	for (int i = 0; i < predictions.size(); i++) {
-		out << i + 1 << ',' << predictions[i] << '\n';
-	}
+	// for (int i = 0; i < predictions.size(); i++) {
+	// 	out << i + 1 << ',' << predictions[i] << '\n';
+	// }
 
 }

@@ -5,6 +5,8 @@
 namespace nn {
 
 template<
+	int kInFeatures,
+	int kChannels,
 	int kKernel,
 	int kPadding,
 	int kStride,
@@ -12,6 +14,9 @@ template<
 >
 class MaxPool {
 	static_assert(kPadding >= 0 and kKernel > kPadding and kStride > 0);
+
+	static constexpr int kInFeaturesPadded = kInFeatures + 2 * kPadding;
+	static constexpr int kOutFeatures = (kInFeaturesPadded - kKernel + kStride) / kStride;
 
 public:
 
@@ -21,12 +26,8 @@ public:
 	}
 
 
-	template<uint64_t kInFeatures, uint64_t kChannels>
 	auto recurse (const nn::util::image<kInFeatures, kChannels>& _X, const int label)
 	{
-		static constexpr int kInFeaturesPadded = kInFeatures + 2 * kPadding;
-		static constexpr int kOutFeatures = (kInFeaturesPadded - kKernel + kStride) / kStride;
-
 		auto X { nn::util::pad<kInFeatures, kChannels, kPadding>(_X) };
 
 		auto [gradient, loss] = L.recurse(forward(X), label);
@@ -34,7 +35,6 @@ public:
 	}
 	
 
-	template<uint64_t kInFeatures, uint64_t kChannels>
 	auto evaluate (const nn::util::image<kInFeatures, kChannels>& _X, const int label) const
 	{
 		auto X { nn::util::pad<kInFeatures, kChannels, kPadding>(_X) };
@@ -42,7 +42,6 @@ public:
 	}
 
 
-	template<uint64_t kInFeatures, uint64_t kChannels>
 	auto predict (const nn::util::image<kInFeatures, kChannels>& _X) const
 	{
 		auto X { nn::util::pad<kInFeatures, kChannels, kPadding>(_X) };
@@ -64,7 +63,6 @@ public:
 
 private:
 
-	template<uint64_t kInFeaturesPadded, uint64_t kChannels>
 	auto forward (const nn::util::image<kInFeaturesPadded, kChannels>& X) const
 	{
 		static constexpr int kOutFeatures = (kInFeaturesPadded - kKernel) / kStride + 1;
@@ -85,7 +83,6 @@ private:
 	}
 
 
-	template<uint64_t kInFeaturesPadded, uint64_t kOutFeatures, uint64_t kChannels>
 	auto backward (const nn::util::image<kInFeaturesPadded, kChannels>& X, const nn::util::image<kOutFeatures, kChannels>& grad_Y)
 	{
 		static_assert(kOutFeatures == (kInFeaturesPadded - kKernel) / kStride + 1);
