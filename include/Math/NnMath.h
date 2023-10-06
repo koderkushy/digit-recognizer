@@ -95,7 +95,7 @@ struct FastMath {
 	static auto mat_mul (const std::array<std::array<float, N>, M>& A, const std::array<std::array<float, K>, N>& B) {
 		std::array<std::array<float, K>, M> C {};
 
-		if constexpr (std::min({N, M, K}) > 50)
+		if constexpr (std::min({N, M, K}) > 20)
 			fast_mat_mul(A, B, C);
 		else
 			for (int i = 0; i < M; i++)

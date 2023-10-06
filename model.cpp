@@ -54,7 +54,7 @@ struct MnistDigitRecogniser {
 				// batch_loss += loss;
 			});
 
-			std::cout << (i-begin(train_set)) / double(train_set.size()) << " completed\n" << std::flush;
+			// std::cout << (i-begin(train_set)) / double(train_set.size()) << " completed\n" << std::flush;
 
 			nn.optimize();
 			// auto stop = std::chrono::high_resolution_clock::now();
@@ -134,18 +134,21 @@ int main(){
 
 	std::mt19937 rng(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
-	auto train_set = nn::util::load_labeled_mnist("sample_data/mnist_train_small.csv");
+	auto train_set = nn::util::load_labeled_mnist("sample_data/train.csv");
 	std::shuffle(begin(train_set), end(train_set), rng);
 
 	// auto test_set = std::vector(end(train_set) - 0.2 * train_set.size(), end(train_set));
 	// train_set.erase(end(train_set) - 0.2 * train_set.size(), end(train_set));
 
-	auto val_set = std::vector(end(train_set) - 0.2 * train_set.size(), end(train_set));
-	train_set.erase(end(train_set) - 0.2 * train_set.size(), end(train_set));
+	auto val_set = std::vector(end(train_set) - 0.05 * train_set.size(), end(train_set));
+	train_set.erase(end(train_set) - 0.05 * train_set.size(), end(train_set));
+	
+	auto test_set = nn::util::load_unlabeled_mnist("sample_data/test.csv");
 
 
 	std::cout << "Training set has " << train_set.size() << " images\n";
 	std::cout << "Validation set has " << val_set.size() << " images\n";
+	std::cout << "Test set has " << test_set.size() << " images" << std::endl;
 	// std::cout << "Test set has " << test_set.size() << " images\n" << std::endl;
 
 
@@ -156,33 +159,33 @@ int main(){
 
 		std::shuffle(begin(train_set), end(train_set), rng);
 
-		model.train(train_set, 64);
+		model.train(train_set, 16);
 
 		// if (model.validate(val_set) < least_val_loss)
 		// 	model.save();
 
 		std::cout << "Accuracy " << model.test(val_set) << " %" << std::endl;
+
+		std::vector predictions(test_set.size(), 0);
+		std::vector iota(test_set.size(), 0);
+
+		std::iota(begin(iota), end(iota), 0);
+
+		std::for_each(std::execution::par, begin(iota), end(iota), [&](const int i) {
+			predictions[i] = model.predict(test_set[i]);
+		});
+
+		std::ofstream out("sample_data/predictions-" + std::to_string(epoch + 1) + ".csv");
+
+		out << "ImageId" << ',' << "Label" << '\n';
+
+		for (int i = 0; i < predictions.size(); i++) {
+			out << i + 1 << ',' << predictions[i] << '\n';
+		}
 	}
 
-	// auto test_set = nn::util::load_unlabeled_mnist("sample_data/test.csv");
+	
 
-	// std::cout << "Test set has " << test_set.size() << " images" << std::endl;
-
-	// std::vector predictions(test_set.size(), 0);
-	// std::vector iota(test_set.size(), 0);
-
-	// std::iota(begin(iota), end(iota), 0);
-
-	// std::for_each(std::execution::par, begin(iota), end(iota), [&](const int i) {
-	// 	predictions[i] = model.predict(test_set[i]);
-	// });
-
-	// std::ofstream out("sample_data/predictions.csv");
-
-	// out << "ImageId" << ',' << "Label" << '\n';
-
-	// for (int i = 0; i < predictions.size(); i++) {
-	// 	out << i + 1 << ',' << predictions[i] << '\n';
-	// }
+	
 
 }
