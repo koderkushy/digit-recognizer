@@ -60,15 +60,43 @@ public:
 	}
 
 
-	auto save (const std::string path)
+	void save (const std::string path, const int layer_index = 0) const
 	{
-		L.save(path);
+		std::ofstream desc_out(path + "model_description.txt"
+									, std::ios::out | std::ios::app);
+		std::ofstream lyr_stream(path + "layer-" + std::to_string(layer_index) + ".bin"
+									, std::ios::out | std::ios::binary);
+
+		desc_out << "drop out\n"
+			<< "size " << kSize << '\n'
+			<< "channels " << kChannels << '\n'
+			<< "drop out percent " << kPercent << '\n' << std::flush;
+		
+		desc_out.close();
+		lyr_stream.close();
+
+		L.save(path, layer_index + 1);
+	}
+
+	void load (const std::string path, const int layer_index = 0)
+	{
+		std::ifstream lyr_stream(path + "layer-" + std::to_string(layer_index) + ".bin"
+									, std::ios::in | std::ios::binary);
+		
+		assert(lyr_stream.is_open());
+		lyr_stream.close();
+
+		L.load(path, layer_index + 1);
 	}
 
 
 	auto optimize ()
 	{
 		L.optimize();
+	}
+
+	auto size () const {
+		return L.size();
 	}
 
 

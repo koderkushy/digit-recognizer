@@ -42,8 +42,32 @@ public:
 	{}
 
 
-	void save (const std::string path)
-	{}
+	void save (const std::string path, const int layer_index = 0) const
+	{
+		std::ofstream desc_out(path + "model_description.txt"
+									, std::ios::out | std::ios::app);
+		std::ofstream lyr_stream(path + "layer-" + std::to_string(layer_index) + ".bin"
+									, std::ios::out | std::ios::binary);
+
+		desc_out << "output\n"
+			<< "classes " << kClasses << '\n' << std::flush;
+		
+		desc_out.close();
+		lyr_stream.close();
+	}
+
+	void load (const std::string path, const int layer_index = 0)
+	{
+		std::ifstream lyr_stream(path + "layer-" + std::to_string(layer_index) + ".bin"
+									, std::ios::in | std::ios::binary);
+		
+		assert(lyr_stream.is_open());
+		lyr_stream.close();
+	}
+
+	size_t size () const {
+		return 0;
+	}
 
 };
 

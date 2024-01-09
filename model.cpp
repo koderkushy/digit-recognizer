@@ -32,7 +32,17 @@ struct MnistDigitRecogniser {
 
 	using image28 = nn::util::image<28, 1>;
 
-	auto save () { nn.save("data/model.txt"); }
+	auto save (const std::string& path) const {
+		std::ofstream desc_out(path + "model_description.txt"
+									, std::ios::out);
+		desc_out.close();
+		nn.save(path);
+	}
+
+	auto load (const std::string& path) {
+		nn.load(path);
+	}
+
 	auto predict (const image28& x) { return nn.predict(x); }
 	// auto recurse (const image28& x, int label) { return nn.recurse(x, label); }
 	// auto evaluate (const image28& x, int label) { return nn.evaluate(x, label); }
@@ -96,6 +106,10 @@ struct MnistDigitRecogniser {
 
 		return count * 100.0 / test_set.size();
 	}
+
+	auto size () const {
+		return nn.size();
+	}
 };
 
 
@@ -132,9 +146,11 @@ int main(){
 		nn::OutputLayer<10, LossFunctions::CrossEntropy
 	>>>>>>>>>>>>>>>>> model{ };
 
+	std::cout << "model size " << model.size() << '\n';
+
 	std::mt19937 rng(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
-	auto train_set = nn::util::load_labeled_mnist("sample_data/train.csv");
+	auto train_set = nn::util::load_labeled_mnist("sample_data/mnist_train_small.csv");
 	std::shuffle(begin(train_set), end(train_set), rng);
 
 	// auto test_set = std::vector(end(train_set) - 0.2 * train_set.size(), end(train_set));
@@ -154,34 +170,35 @@ int main(){
 
 	float least_val_loss = std::numeric_limits<float>::max();
 
-	for (int epoch = 0; epoch < 5; epoch++) {
+	for (int epoch = 0; epoch < 1; epoch++) {
 		std::cout << "Epoch " << epoch + 1 << std::endl;
 
 		std::shuffle(begin(train_set), end(train_set), rng);
 
-		model.train(train_set, 16);
+		// model.train(train_set, 32);
+		model.load("saved_models/model_0/");
 
 		// if (model.validate(val_set) < least_val_loss)
-		// 	model.save();
+		// 	model.save("saved_models/model_0/");
 
 		std::cout << "Accuracy " << model.test(val_set) << " %" << std::endl;
 
-		std::vector predictions(test_set.size(), 0);
-		std::vector iota(test_set.size(), 0);
+		// std::vector predictions(test_set.size(), 0);
+		// std::vector iota(test_set.size(), 0);
 
-		std::iota(begin(iota), end(iota), 0);
+		// std::iota(begin(iota), end(iota), 0);
 
-		std::for_each(std::execution::par, begin(iota), end(iota), [&](const int i) {
-			predictions[i] = model.predict(test_set[i]);
-		});
+		// std::for_each(std::execution::par, begin(iota), end(iota), [&](const int i) {
+		// 	predictions[i] = model.predict(test_set[i]);
+		// });
 
-		std::ofstream out("sample_data/predictions-" + std::to_string(epoch + 1) + ".csv");
+		// std::ofstream out("sample_data/predictions-" + std::to_string(epoch + 1) + ".csv");
 
-		out << "ImageId" << ',' << "Label" << '\n';
+		// out << "ImageId" << ',' << "Label" << '\n';
 
-		for (int i = 0; i < predictions.size(); i++) {
-			out << i + 1 << ',' << predictions[i] << '\n';
-		}
+		// for (int i = 0; i < predictions.size(); i++) {
+		// 	out << i + 1 << ',' << predictions[i] << '\n';
+		// }
 	}
 
 	

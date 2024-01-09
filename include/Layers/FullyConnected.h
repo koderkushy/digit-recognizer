@@ -79,23 +79,43 @@ public:
 	}
 
 
-	void save (const std::string path)
+	void save (const std::string path, const int layer_index = 0) const
 	{
-		std::ofstream out(path, std::ios::app);
+		std::ofstream desc_out(path + "model_description.txt"
+									, std::ios::out | std::ios::app);
+		std::ofstream modl_out(path + "layer-" + std::to_string(layer_index) + ".bin"
+									, std::ios::out | std::ios::binary);
 
-		out << "fcon " << kOutWidth << ' ' << kInWidth << '\n';
-
-		for (int i = 0; i < kOutWidth; i++)
-			for (int j = 0; j < kInWidth; j++)
-				out << W[i][j] << ' ';
-		out << '\n';
-		for (int i = 0; i < kOutWidth; i++)
-			out << b[i] << ' ';
-		out << '\n' << std::flush;
-
-		out.close();
+		desc_out << "fully connected\n"
+			<< "features " << kFeatures << '\n'
+			<< "channels " << kChannels << '\n'
+			<< "output width " << kOutWidth << '\n' << std::flush;
 		
-		L.save(path);
+		desc_out.close();
+    	
+    	modl_out.write(reinterpret_cast<const char*>(&W), sizeof(decltype(W)));
+    	modl_out.write(reinterpret_cast<const char*>(&b), sizeof(decltype(b)));
+		modl_out.close();
+
+		L.save(path, layer_index + 1);
+	}
+
+	void load (const std::string path, const int layer_index = 0)
+	{
+		std::ifstream lyr_stream(path + "layer-" + std::to_string(layer_index) + ".bin"
+									, std::ios::in | std::ios::binary);
+		
+		assert(lyr_stream.is_open());
+		lyr_stream.read(reinterpret_cast<char*>(&W), sizeof(decltype(W)));
+		lyr_stream.read(reinterpret_cast<char*>(&b), sizeof(decltype(b)));
+
+		lyr_stream.close();
+
+		L.load(path, layer_index + 1);
+	}
+
+	auto size () const {
+		return 2 * kOutWidth * (1 + kInWidth) + L.size();
 	}
 
 

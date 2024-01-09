@@ -1,4 +1,6 @@
 model
 initial
 sample_data/train.csv
+sample_data/test.csv
 model.cpp:tests
+saved_models/*

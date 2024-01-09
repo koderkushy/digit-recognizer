@@ -90,26 +90,44 @@ public:
 	}
 
 	
-	void save (const std::string path)
+	void save (const std::string path, const int layer_index = 0) const
 	{
-		std::ofstream out(path, std::ios::app);
+		std::ofstream desc_out(path + "model_description.txt"
+									, std::ios::out | std::ios::app);
+		std::ofstream lyr_stream(path + "layer-" + std::to_string(layer_index) + ".bin"
+									, std::ios::out | std::ios::binary);
 
-		out << "conv " << kOutChannels << ' ' << kInChannels << ' ' << kKernel << '\n';
+		desc_out << "conv\n"
+			<< "input features " << kInFeatures << '\n'
+			<< "input channels " << kInChannels << '\n'
+			<< "kernel size " << kKernel << '\n'
+			<< "padding " << kPadding << '\n'
+			<< "output channels " << kOutChannels << '\n' << std::flush;
+		desc_out.close();
+    	
+    	lyr_stream.write(reinterpret_cast<const char*>(&W), sizeof(decltype(W)));
+    	lyr_stream.write(reinterpret_cast<const char*>(&b), sizeof(decltype(b)));
+		lyr_stream.close();
 
-		for (int o = 0; o < kOutChannels; o++)
-			for (int i = 0; i < kInChannels; i++)
-				for (int x = 0; x < kKernel; x++)
-					for (int y = 0; y < kKernel; y++)
-						out << W[o][i][x][y] << ' ';
+		L.save(path, layer_index + 1);
+	}
 
-		out << '\n';
-		for (int o = 0; o < kOutChannels; o++)
-			out << b[o] << ' ';
-		out << '\n' << std::flush;
+	void load (const std::string path, const int layer_index = 0)
+	{
+		std::ifstream lyr_stream(path + "layer-" + std::to_string(layer_index) + ".bin"
+									, std::ios::in | std::ios::binary);
+		
+		assert(lyr_stream.is_open());
+		lyr_stream.read(reinterpret_cast<char*>(&W), sizeof(decltype(W)));
+		lyr_stream.read(reinterpret_cast<char*>(&b), sizeof(decltype(b)));
 
-		out.close();
+		lyr_stream.close();
 
-		L.save(path);
+		L.load(path, layer_index + 1);
+	}
+
+	auto size () const {
+		return (kKernel * kInChannels + 1) * kOutChannels * 2 + L.size();
 	}
 
 
